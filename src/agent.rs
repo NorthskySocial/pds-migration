@@ -1,6 +1,7 @@
 use crate::error_code::{CustomError, CustomErrorType};
 use crate::CreateAccountRequest;
-use bsky_sdk::api::agent::Session;
+use bsky_sdk::api::agent::atp_agent::AtpSession;
+use bsky_sdk::api::agent::Configure;
 use bsky_sdk::api::app::bsky::actor::defs::Preferences;
 use bsky_sdk::api::com::atproto::identity::sign_plc_operation::InputData;
 use bsky_sdk::api::com::atproto::repo::list_missing_blobs::RecordBlob;
@@ -25,7 +26,7 @@ pub async fn login(
     pds: &str,
     username: &str,
     password: &str,
-) -> Result<Session, Box<dyn std::error::Error>> {
+) -> Result<AtpSession, Box<dyn std::error::Error>> {
     bsky_agent.configure_endpoint(pds.to_string());
     let result = bsky_agent.login(username, password).await?;
     Ok(result)

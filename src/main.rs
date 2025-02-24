@@ -7,17 +7,15 @@ use crate::error_code::{CustomError, CustomErrorType};
 use actix_web::dev::Server;
 use actix_web::web::Json;
 use actix_web::{middleware, post, App, HttpResponse, HttpServer};
-use bsky_sdk::api::agent::Session;
+use bsky_sdk::api::agent::atp_agent::AtpSession;
+use bsky_sdk::api::agent::Configure;
 use bsky_sdk::api::types::string::Did;
 use bsky_sdk::BskyAgent;
 use dotenvy::dotenv;
 use ipld_core::cid::Cid;
 use serde::{Deserialize, Serialize};
-use aws_sdk_s3 as s3;
 use std::{env, io};
 use std::io::ErrorKind;
-use aws_config::SdkConfig;
-use aws_sdk_s3::operation::put_object::{PutObjectError, PutObjectOutput};
 
 pub mod agent;
 pub mod error_code;
@@ -511,7 +509,7 @@ async fn login_helper(
     pds_host: &str,
     username: &str,
     password: &str,
-) -> Result<Session, CustomError> {
+) -> Result<AtpSession, CustomError> {
     agent.configure_endpoint(pds_host.to_string());
     match agent.login(username, password).await {
         Ok(session) => {
