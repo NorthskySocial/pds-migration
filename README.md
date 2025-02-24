@@ -5,3 +5,16 @@
 
 ## Overview
 Backend Application that accepts HTTP calls allowing for a user to migrate from one PDS to another
+
+## Steps to Migrate
+1. /service-auth
+2. /create-account
+3. /export-repo
+4. /import-repo
+5. /export-blobs
+6. /upload-blobs
+7. /migrate-preferences
+8. /request-token
+9. /migrate-plc
+10. /activate-account
+11. /deactivate-account
