@@ -12,6 +12,9 @@ RUN cargo build --release
 
 COPY src src
 
+# You have to make the timestamp newer for it to build
+RUN touch src/main.rs
+
 RUN cargo build --release
 
 FROM rust:slim
