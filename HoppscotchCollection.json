@@ -1,0 +1,234 @@
+{
+  "v": 6,
+  "id": "cm5qhmv36000a685k87yfcvp2",
+  "name": "Migrations",
+  "folders": [],
+  "requests": [
+    {
+      "v": "11",
+      "name": "Service Auth",
+      "method": "POST",
+      "endpoint": "<<host>>/service-auth",
+      "params": [],
+      "headers": [],
+      "preRequestScript": "",
+      "testScript": "",
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "body": {
+        "contentType": "application/json",
+        "body": "{\n  \"pds_host\": \"<<old_host>>\",\n  \"handle\": \"<<old_handle>>\",\n  \"password\": \"<<old_password>>\",\n  \"aud\": \"did:web:pds.ripperoni.com\"\n}"
+      },
+      "requestVariables": [],
+      "responses": {}
+    },
+    {
+      "v": "11",
+      "name": "Create Account",
+      "method": "POST",
+      "endpoint": "<<host>>/create-account",
+      "params": [],
+      "headers": [],
+      "preRequestScript": "",
+      "testScript": "",
+      "auth": {
+        "authType": "none",
+        "authActive": true
+      },
+      "body": {
+        "contentType": "application/json",
+        "body": "{\n  \"pds_host\": \"<<new_host>>\",\n  \"handle\": \"<<new_handle>>\",\n  \"password\": \"<<new_password>>\",\n  \"email\": \"anothermigration@ripperoni.com\",\n  \"token\": \"eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksifQ.eyJpYXQiOjE3NDA0MjcxNjksImlzcyI6ImRpZDpwbGM6eWxkbGNpcXV4ZXhneWM2Z3p4d3JmY29tIiwiYXVkIjoiZGlkOndlYjpwZHMucmlwcGVyb25pLmNvbSIsImV4cCI6MTc0MDQyNzIyOSwibHhtIjoiY29tLmF0cHJvdG8uc2VydmVyLmNyZWF0ZUFjY291bnQiLCJqdGkiOiJkYWJkYWIyYjI0OGRiMGIwMjhhOWY2OGQ4MGFlNTVlNiJ9.a8pnvTYbRoRkqrFY9Td8hfirkm9tON9HSSShkPw1j_4ecNyGcuYLM0FnbFjaJr1B5Imam_5sqYk1skPPjrIQrA\",\n  \"did\": \"did:plc:yldlciquxexgyc6gzxwrfcom\",\n  \"invite_code\": \"pds-ripperoni-com-ceuso-6bmgc\"\n}\n"
+      },
+      "requestVariables": [],
+      "responses": {}
+    },
+    {
+      "v": "11",
+      "name": "Export Repo",
+      "method": "POST",
+      "endpoint": "<<host>>/export-repo",
+      "params": [],
+      "headers": [],
+      "preRequestScript": "",
+      "testScript": "",
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "body": {
+        "contentType": "application/json",
+        "body": "{\n  \"pds_host\": \"<<old_host>>\",\n  \"handle\": \"<<old_handle>>\",\n  \"password\": \"<<old_password>>\"\n}"
+      },
+      "requestVariables": [],
+      "responses": {}
+    },
+    {
+      "v": "11",
+      "name": "Import Repo",
+      "method": "POST",
+      "endpoint": "<<host>>/import-repo",
+      "params": [],
+      "headers": [],
+      "preRequestScript": "",
+      "testScript": "",
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "body": {
+        "contentType": "application/json",
+        "body": "{\n  \"pds_host\": \"<<new_host>>\",\n  \"handle\": \"<<new_handle>>\",\n  \"password\": \"<<new_password>>\"\n}"
+      },
+      "requestVariables": [],
+      "responses": {}
+    },
+    {
+      "v": "11",
+      "name": "Export Blobs",
+      "method": "POST",
+      "endpoint": "<<host>>/export-blobs",
+      "params": [],
+      "headers": [],
+      "preRequestScript": "",
+      "testScript": "",
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "body": {
+        "contentType": "application/json",
+        "body": "{\n  \"new_pds_host\": \"<<new_host>>\",\n  \"new_handle\": \"<<new_handle>>\",\n  \"new_password\": \"<<new_password>>\",\n  \"old_pds_host\": \"<<old_host>>\",\n  \"old_handle\": \"<<old_handle>>\",\n  \"old_password\": \"<<old_password>>\"\n}"
+      },
+      "requestVariables": [],
+      "responses": {}
+    },
+    {
+      "v": "11",
+      "name": "Upload Blobs",
+      "method": "POST",
+      "endpoint": "<<host>>/upload-blobs",
+      "params": [],
+      "headers": [],
+      "preRequestScript": "",
+      "testScript": "",
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "body": {
+        "contentType": "application/json",
+        "body": "{\n  \"pds_host\": \"<<new_host>>\",\n  \"handle\": \"<<new_handle>>\",\n  \"password\": \"<<new_password>>\"\n}"
+      },
+      "requestVariables": [],
+      "responses": {}
+    },
+    {
+      "v": "11",
+      "name": "Migrate Preferences",
+      "method": "POST",
+      "endpoint": "<<host>>/migrate-preferences",
+      "params": [],
+      "headers": [],
+      "preRequestScript": "",
+      "testScript": "",
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "body": {
+        "contentType": "application/json",
+        "body": "{\n  \"new_pds_host\": \"<<new_host>>\",\n  \"new_handle\": \"<<new_handle>>\",\n  \"new_password\": \"<<new_password>>\",\n  \"old_pds_host\": \"<<old_host>>\",\n  \"old_handle\": \"<<old_handle>>\",\n  \"old_password\": \"<<old_password>>\"\n}"
+      },
+      "requestVariables": [],
+      "responses": {}
+    },
+    {
+      "v": "11",
+      "name": "Request Token",
+      "method": "POST",
+      "endpoint": "<<host>>/request-token",
+      "params": [],
+      "headers": [],
+      "preRequestScript": "",
+      "testScript": "",
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "body": {
+        "contentType": "application/json",
+        "body": "{\n  \"pds_host\": \"<<old_host>>\",\n  \"handle\": \"<<old_handle>>\",\n  \"password\": \"<<old_password>>\"\n}"
+      },
+      "requestVariables": [],
+      "responses": {}
+    },
+    {
+      "v": "11",
+      "name": "Migrate PLC",
+      "method": "POST",
+      "endpoint": "<<host>>/migrate-plc",
+      "params": [],
+      "headers": [],
+      "preRequestScript": "",
+      "testScript": "",
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "body": {
+        "contentType": "application/json",
+        "body": "{\n  \"new_pds_host\": \"<<new_host>>\",\n  \"new_handle\": \"<<new_handle>>\",\n  \"new_password\": \"<<new_password>>\",\n  \"old_pds_host\": \"<<old_host>>\",\n  \"old_handle\": \"<<old_handle>>\",\n  \"old_password\": \"<<old_password>>\",\n  \"plc_signing_token\": \"FJUTX-TNJ34\"\n}"
+      },
+      "requestVariables": [],
+      "responses": {}
+    },
+    {
+      "v": "11",
+      "name": "Activate Account",
+      "method": "POST",
+      "endpoint": "<<host>>/activate-account",
+      "params": [],
+      "headers": [],
+      "preRequestScript": "",
+      "testScript": "",
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "body": {
+        "contentType": "application/json",
+        "body": "{\n  \"pds_host\": \"<<new_host>>\",\n  \"handle\": \"<<new_handle>>\",\n  \"password\": \"<<new_password>>\"\n}"
+      },
+      "requestVariables": [],
+      "responses": {}
+    },
+    {
+      "v": "11",
+      "name": "Deactivate Account",
+      "method": "POST",
+      "endpoint": "<<host>>/deactivate-account",
+      "params": [],
+      "headers": [],
+      "preRequestScript": "",
+      "testScript": "",
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "body": {
+        "contentType": "application/json",
+        "body": "{\n  \"pds_host\": \"<<old_host>>\",\n  \"handle\": \"<<old_handle>>\",\n  \"password\": \"<<old_password>>\"\n}"
+      },
+      "requestVariables": [],
+      "responses": {}
+    }
+  ],
+  "auth": {
+    "authType": "inherit",
+    "authActive": true
+  },
+  "headers": [],
+  "_ref_id": "coll_m7jjipel_bdaeb081-cbab-4397-8dae-1d61c167effe"
+}
