@@ -19,7 +19,7 @@
       },
       "body": {
         "contentType": "application/json",
-        "body": "{\n  \"pds_host\": \"<<old_host>>\",\n  \"handle\": \"<<old_handle>>\",\n  \"password\": \"<<old_password>>\",\n  \"aud\": \"did:web:pds.ripperoni.com\"\n}"
+        "body": "{\n  \"pds_host\": \"<<old_host>>\",\n  \"did\": <<did>>,\n  \"token\": <<session_token>>,\n  \"aud\": \"did:web:pds.northsky.social\"\n}"
       },
       "requestVariables": [],
       "responses": {}
@@ -39,7 +39,7 @@
       },
       "body": {
         "contentType": "application/json",
-        "body": "{\n  \"pds_host\": \"<<new_host>>\",\n  \"handle\": \"<<new_handle>>\",\n  \"password\": \"<<new_password>>\",\n  \"email\": \"anothermigration@ripperoni.com\",\n  \"token\": \"eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksifQ.eyJpYXQiOjE3NDA0MjcxNjksImlzcyI6ImRpZDpwbGM6eWxkbGNpcXV4ZXhneWM2Z3p4d3JmY29tIiwiYXVkIjoiZGlkOndlYjpwZHMucmlwcGVyb25pLmNvbSIsImV4cCI6MTc0MDQyNzIyOSwibHhtIjoiY29tLmF0cHJvdG8uc2VydmVyLmNyZWF0ZUFjY291bnQiLCJqdGkiOiJkYWJkYWIyYjI0OGRiMGIwMjhhOWY2OGQ4MGFlNTVlNiJ9.a8pnvTYbRoRkqrFY9Td8hfirkm9tON9HSSShkPw1j_4ecNyGcuYLM0FnbFjaJr1B5Imam_5sqYk1skPPjrIQrA\",\n  \"did\": \"did:plc:yldlciquxexgyc6gzxwrfcom\",\n  \"invite_code\": \"pds-ripperoni-com-ceuso-6bmgc\"\n}\n"
+        "body": "{\n  \"pds_host\": \"<<new_host>>\",\n  \"handle\": \"<<new_handle>>\",\n  \"password\": \"<<new_password>>\",\n  \"email\": <<new_email>>,\n  \"token\": <<service_token>>,\n  \"did\": <<did>>,\n  \"invite_code\": \"pds-ripperoni-com-ceuso-6bmgc\"\n}\n"
       },
       "requestVariables": [],
       "responses": {}
@@ -59,7 +59,7 @@
       },
       "body": {
         "contentType": "application/json",
-        "body": "{\n  \"pds_host\": \"<<old_host>>\",\n  \"handle\": \"<<old_handle>>\",\n  \"password\": \"<<old_password>>\"\n}"
+        "body": "{\n  \"pds_host\": \"<<old_host>>\",\n  \"did\": <<did>>,\n  \"token\": <<session_token>>,\n}"
       },
       "requestVariables": [],
       "responses": {}
@@ -99,7 +99,7 @@
       },
       "body": {
         "contentType": "application/json",
-        "body": "{\n  \"new_pds_host\": \"<<new_host>>\",\n  \"new_handle\": \"<<new_handle>>\",\n  \"new_password\": \"<<new_password>>\",\n  \"old_pds_host\": \"<<old_host>>\",\n  \"old_handle\": \"<<old_handle>>\",\n  \"old_password\": \"<<old_password>>\"\n}"
+        "body": "{\n  \"new_pds_host\": \"<<new_host>>\",\n  \"new_handle\": \"<<new_handle>>\",\n  \"new_password\": \"<<new_password>>\",\n  \"old_pds_host\": \"<<old_host>>\",\n  \"did\": <<did>>,\n  \"token\": <<session_token>>,\n}"
       },
       "requestVariables": [],
       "responses": {}
@@ -139,7 +139,7 @@
       },
       "body": {
         "contentType": "application/json",
-        "body": "{\n  \"new_pds_host\": \"<<new_host>>\",\n  \"new_handle\": \"<<new_handle>>\",\n  \"new_password\": \"<<new_password>>\",\n  \"old_pds_host\": \"<<old_host>>\",\n  \"old_handle\": \"<<old_handle>>\",\n  \"old_password\": \"<<old_password>>\"\n}"
+        "body": "{\n  \"new_pds_host\": \"<<new_host>>\",\n  \"new_handle\": \"<<new_handle>>\",\n  \"new_password\": \"<<new_password>>\",\n  \"old_pds_host\": \"<<old_host>>\",\n  \"did\": <<did>>,\n  \"token\": <<session_token>>,\n}"
       },
       "requestVariables": [],
       "responses": {}
@@ -219,7 +219,7 @@
       },
       "body": {
         "contentType": "application/json",
-        "body": "{\n  \"pds_host\": \"<<old_host>>\",\n  \"handle\": \"<<old_handle>>\",\n  \"password\": \"<<old_password>>\"\n}"
+        "body": "{\n  \"pds_host\": \"<<old_host>>\",\n  \"did\": <<did>>,\n  \"token\": <<session_token>>,\n}"
       },
       "requestVariables": [],
       "responses": {}
@@ -230,5 +230,5 @@
     "authActive": true
   },
   "headers": [],
-  "_ref_id": "coll_m7jjipel_bdaeb081-cbab-4397-8dae-1d61c167effe"
+  "_ref_id": "coll_m7lkwlce_48abfa9d-fb60-4330-b994-7886e9068674"
 }

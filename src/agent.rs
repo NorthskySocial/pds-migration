@@ -5,7 +5,7 @@ use bsky_sdk::api::agent::Configure;
 use bsky_sdk::api::app::bsky::actor::defs::Preferences;
 use bsky_sdk::api::com::atproto::identity::sign_plc_operation::InputData;
 use bsky_sdk::api::com::atproto::repo::list_missing_blobs::RecordBlob;
-use bsky_sdk::api::types::string::{Cid, Did, Nsid};
+use bsky_sdk::api::types::string::{Cid, Did, Handle, Nsid};
 use bsky_sdk::api::types::Unknown;
 use bsky_sdk::BskyAgent;
 use ipld_core::ipld::Ipld;
@@ -14,22 +14,45 @@ pub type GetAgentResult = Result<BskyAgent, Box<dyn std::error::Error>>;
 pub type RecommendedDidOutputData =
     bsky_sdk::api::com::atproto::identity::get_recommended_did_credentials::OutputData;
 
-pub async fn get_agent(username: &str, password: &str) -> GetAgentResult {
-    let agent: BskyAgent = BskyAgent::builder().build().await?;
-    agent.login(username, password).await?;
-    Ok(agent)
-}
-
-#[tracing::instrument(skip(bsky_agent))]
-pub async fn login(
-    bsky_agent: BskyAgent,
-    pds: &str,
-    username: &str,
-    password: &str,
-) -> Result<AtpSession, Box<dyn std::error::Error>> {
-    bsky_agent.configure_endpoint(pds.to_string());
-    let result = bsky_agent.login(username, password).await?;
-    Ok(result)
+#[tracing::instrument(skip(agent, token))]
+pub async fn login_helper(
+    agent: &BskyAgent,
+    pds_host: &str,
+    did: &str,
+    token: &str,
+) -> Result<AtpSession, CustomError> {
+    use bsky_sdk::api::com::atproto::server::create_session::OutputData;
+    agent.configure_endpoint(pds_host.to_string());
+    match agent
+        .resume_session(AtpSession {
+            data: OutputData {
+                access_jwt: token.to_string(),
+                active: Some(true),
+                did: Did::new(did.to_string()).unwrap(),
+                did_doc: None,
+                email: None,
+                email_auth_factor: None,
+                email_confirmed: None,
+                handle: Handle::new("anothermigration.bsky.social".to_string()).unwrap(),
+                refresh_jwt: "".to_string(),
+                status: None,
+            },
+            extra_data: Ipld::Null,
+        })
+        .await
+    {
+        Ok(_) => {
+            tracing::info!("Successfully logged in");
+            Ok(agent.get_session().await.unwrap())
+        }
+        Err(e) => {
+            tracing::error!("Error logging in: {:?}", e);
+            Err(CustomError {
+                message: Some("Failed to login".to_string()),
+                err_type: CustomErrorType::LoginError,
+            })
+        }
+    }
 }
 
 #[tracing::instrument(skip(agent))]

@@ -36,7 +36,7 @@ impl ResponseError for CustomError {
     fn status_code(&self) -> StatusCode {
         match self.err_type {
             CustomErrorType::ValidationError => StatusCode::BAD_REQUEST,
-            _ => { StatusCode::INTERNAL_SERVER_ERROR }
+            _ => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
     fn error_response(&self) -> HttpResponse {
