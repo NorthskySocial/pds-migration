@@ -9,7 +9,7 @@ use bsky_sdk::BskyAgent;
 use eframe::egui;
 use egui::UiKind::Popup;
 use egui::{PopupCloseBehavior, TextBuffer};
-use pdsmigration_common::ServiceAuthRequest;
+use pdsmigration_common::{CreateAccountApiRequest, CreateAccountRequest, ServiceAuthRequest};
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 use tokio::runtime::Runtime;
@@ -20,7 +20,16 @@ const DIRECTORY_NAME: &str = "AdventureNodes";
 enum Page {
     Home,
     Login(Login),
-    ServiceAuth(ServiceAuth),
+    CreateAccount,
+    ExportRepo,
+    ImportRepo,
+    ExportBlobs,
+    UploadBlobs,
+    MigratePreferences,
+    RequestToken,
+    MigratePLC,
+    ActivateAccount,
+    DeactivateAccount,
 }
 
 struct Login {
@@ -72,6 +81,15 @@ struct PdsMigrationApp {
 
     page: Page,
 
+    old_pds_host: String,
+    new_pds_host: String,
+    new_handle: String,
+
+    invite_code: String,
+    // old_pds_host: String,
+    new_email: String,
+    new_password: String,
+
     // Sender/Receiver for async notifications.
     tx: Sender<u32>,
     rx: Receiver<u32>,
@@ -100,6 +118,12 @@ impl Default for PdsMigrationApp {
             old_pds_token: None,
             new_pds_token: None,
             page: Page::Home,
+            old_pds_host: "".to_string(),
+            new_pds_host: "".to_string(),
+            new_handle: "".to_string(),
+            invite_code: "".to_string(),
+            new_email: "".to_string(),
+            new_password: "".to_string(),
             tx,
             rx,
             login_tx,
@@ -112,15 +136,6 @@ impl Default for PdsMigrationApp {
 
 impl eframe::App for PdsMigrationApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // let response = ui.button("Open");
-        //
-        // Popup::menu(&response)
-        //     .close_behavior(PopupCloseBehavior::IgnoreClicks)
-        //     .show(|ui| {
-        //         ui.set_min_width(310.0);
-        //         ui.label("This popup will be open until you press the button again");
-        //         ui.checkbox(&mut self.checkbox, "Checkbox");
-        //     });
         egui::CentralPanel::default().show(ctx, |ui| {
             let res = self.login_rx.try_recv();
             if res.is_ok() {
@@ -134,13 +149,8 @@ impl eframe::App for PdsMigrationApp {
                 Page::Home => {
                     if self.did.is_some() {
                         ui.horizontal(|ui| {
-                            if ui.button("Service Auth").clicked() {
-                                self.page = Page::ServiceAuth(ServiceAuth {
-                                    old_pds_host: "https://bsky.social".to_string(),
-                                    username: "".to_string(),
-                                    password: "".to_string(),
-                                    new_pds_host: "".to_string(),
-                                });
+                            if ui.button("Create Account").clicked() {
+                                self.page = Page::CreateAccount;
                             }
                         });
                     } else {
@@ -173,34 +183,50 @@ impl eframe::App for PdsMigrationApp {
                         session_login(login, self.tx.clone(), self.login_tx.clone(), ctx.clone());
                     }
                 }
-                Page::ServiceAuth(service_auth) => {
-                    ui.heading("Get Service Auth");
-                    ui.horizontal(|ui| {
-                        ui.label("Old PDS Host: ");
-                        ui.text_edit_singleline(&mut service_auth.old_pds_host);
-                    });
+                Page::CreateAccount => {
+                    ui.heading("Create Account On New PDS");
                     ui.horizontal(|ui| {
                         ui.label("New PDS Host: ");
-                        ui.text_edit_singleline(&mut service_auth.new_pds_host);
+                        ui.text_edit_singleline(&mut self.new_pds_host);
                     });
                     ui.horizontal(|ui| {
-                        ui.label("Username: ");
-                        ui.text_edit_singleline(&mut service_auth.username);
+                        ui.label("Invite Code(Leave Blank if None): ");
+                        ui.text_edit_singleline(&mut self.invite_code);
                     });
                     ui.horizontal(|ui| {
-                        ui.label("Password: ");
-                        ui.text_edit_singleline(&mut service_auth.password);
+                        ui.label("Email on new PDS: ");
+                        ui.text_edit_singleline(&mut self.new_email);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Password on new PDS: ");
+                        ui.text_edit_singleline(&mut self.new_password);
                     });
                     if ui.button("Submit").clicked() {
-                        get_service_auth(self, self.tx.clone(), ctx.clone());
+                        create_account(self, self.tx.clone(), ctx.clone());
                     }
                 }
+                Page::ExportRepo => {}
+                Page::ImportRepo => {}
+                Page::ExportBlobs => {}
+                Page::UploadBlobs => {}
+                Page::MigratePreferences => {}
+                Page::RequestToken => {}
+                Page::MigratePLC => {}
+                Page::ActivateAccount => {}
+                Page::DeactivateAccount => {}
             }
         });
     }
 }
 
-fn get_service_auth(service_auth_app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
+fn create_account(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
+    let did = app.did.clone().unwrap();
+    let email = app.new_email.clone();
+    let pds_host = app.new_pds_host.clone();
+    let password = app.new_password.clone();
+    let invite_code = app.invite_code.clone();
+    let handle = app.new_handle.clone();
+
     tokio::spawn(async move {
         let service_auth_request = ServiceAuthRequest {
             pds_host: "".to_string(),
@@ -208,9 +234,20 @@ fn get_service_auth(service_auth_app: &PdsMigrationApp, tx: Sender<u32>, ctx: eg
             did: "".to_string(),
             token: "".to_string(),
         };
-        pdsmigration_common::get_service_auth_api(service_auth_request)
+        let token = pdsmigration_common::get_service_auth_api(service_auth_request)
             .await
             .unwrap();
+
+        let create_account_request = CreateAccountApiRequest {
+            email,
+            handle,
+            invite_code,
+            password,
+            token,
+            pds_host,
+            did,
+        };
+        pdsmigration_common::create_account_api(create_account_request).await.unwrap();
 
         // After parsing the response, notify the GUI thread of the increment value.
         let _ = tx.send(1);
