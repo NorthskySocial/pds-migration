@@ -4,13 +4,9 @@ use crate::agent::{
     missing_blobs, recommended_plc, request_token, sign_plc, submit_plc, upload_blob,
 };
 use crate::error_code::{CustomError, CustomErrorType};
-use actix_web::dev::Server;
-use actix_web::web::Json;
-use actix_web::{middleware, post, App, HttpResponse, HttpServer};
 use bsky_sdk::api::agent::Configure;
 use bsky_sdk::api::types::string::Did;
 use bsky_sdk::BskyAgent;
-use dotenvy::dotenv;
 use ipld_core::cid::Cid;
 use serde::{Deserialize, Serialize};
 use std::io::ErrorKind;
@@ -18,49 +14,6 @@ use std::{env, io};
 
 pub mod agent;
 pub mod error_code;
-
-pub const APPLICATION_JSON: &str = "application/json";
-
-fn init_http_server(server_port: &str, worker_count: &str) -> Server {
-    HttpServer::new(move || {
-        App::new()
-            .wrap(middleware::Logger::default())
-            .service(request_token_api)
-            .service(create_account_api)
-            .service(export_pds_api)
-            .service(import_pds_api)
-            .service(missing_blobs_api)
-            .service(export_blobs_api)
-            .service(upload_blobs_api)
-            .service(activate_account_api)
-            .service(deactivate_account_api)
-            .service(migrate_preferences_api)
-            .service(migrate_plc_api)
-            .service(get_service_auth_api)
-    })
-    .bind(format!("0.0.0.0:{}", server_port))
-    .unwrap()
-    .workers(worker_count.parse::<usize>().unwrap_or(2))
-    .run()
-}
-
-#[actix_rt::main]
-async fn main() -> io::Result<()> {
-    dotenv().ok();
-    env::set_var("RUST_LOG", "actix_web=debug,actix_server=debug");
-    env_logger::init();
-
-    let subscriber = tracing_subscriber::FmtSubscriber::new();
-    tracing::subscriber::set_global_default(subscriber).unwrap();
-
-    // Get Environment Variables
-    let server_port = env::var("SERVER_PORT").unwrap_or("9090".to_string());
-    let worker_count = env::var("WORKER_COUNT").unwrap_or("2".to_string());
-
-    // Start Http Server
-    let server = init_http_server(server_port.as_str(), worker_count.as_str());
-    server.await
-}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ServiceAuthRequest {
@@ -75,10 +28,7 @@ pub struct ServiceAuthResponse {
     pub token: String,
 }
 
-#[post("/service-auth")]
-pub async fn get_service_auth_api(
-    req: Json<ServiceAuthRequest>,
-) -> Result<HttpResponse, CustomError> {
+pub async fn get_service_auth_api(req: ServiceAuthRequest) -> Result<String, CustomError> {
     let agent = BskyAgent::builder().build().await.unwrap();
     login_helper(
         &agent,
@@ -88,8 +38,7 @@ pub async fn get_service_auth_api(
     )
     .await?;
     let token = get_service_auth(&agent, req.aud.as_str()).await?;
-    let response = ServiceAuthResponse { token };
-    Ok(HttpResponse::Ok().json(response))
+    Ok(token)
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -118,10 +67,7 @@ pub struct CreateAccountRequest {
 }
 
 #[tracing::instrument(skip(req))]
-#[post("/create-account")]
-pub async fn create_account_api(
-    req: Json<CreateAccountApiRequest>,
-) -> Result<HttpResponse, CustomError> {
+pub async fn create_account_api(req: CreateAccountApiRequest) -> Result<(), CustomError> {
     create_account(
         req.pds_host.as_str(),
         &CreateAccountRequest {
@@ -138,7 +84,7 @@ pub async fn create_account_api(
         },
     )
     .await?;
-    Ok(HttpResponse::Ok().finish())
+    Ok(())
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -149,8 +95,7 @@ pub struct ExportPDSRequest {
 }
 
 #[tracing::instrument]
-#[post("/export-repo")]
-pub async fn export_pds_api(req: Json<ExportPDSRequest>) -> Result<HttpResponse, CustomError> {
+pub async fn export_pds_api(req: ExportPDSRequest) -> Result<(), CustomError> {
     let agent = BskyAgent::builder().build().await.unwrap();
     let session = login_helper(
         &agent,
@@ -160,7 +105,7 @@ pub async fn export_pds_api(req: Json<ExportPDSRequest>) -> Result<HttpResponse,
     )
     .await?;
     account_export(&agent, &session.did).await?;
-    Ok(HttpResponse::Ok().finish())
+    Ok(())
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -171,8 +116,7 @@ pub struct ImportPDSRequest {
 }
 
 #[tracing::instrument]
-#[post("/import-repo")]
-pub async fn import_pds_api(req: Json<ImportPDSRequest>) -> Result<HttpResponse, CustomError> {
+pub async fn import_pds_api(req: ImportPDSRequest) -> Result<(), CustomError> {
     let agent = BskyAgent::builder().build().await.unwrap();
     let session = login_helper(
         &agent,
@@ -214,7 +158,7 @@ pub async fn import_pds_api(req: Json<ImportPDSRequest>) -> Result<HttpResponse,
         }
     }
     account_import(&agent, (session.did.as_str().to_string() + ".car").as_str()).await?;
-    Ok(HttpResponse::Ok().content_type(APPLICATION_JSON).finish())
+    Ok(())
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -225,10 +169,7 @@ pub struct MissingBlobsRequest {
 }
 
 #[tracing::instrument]
-#[post("/missing-blobs")]
-pub async fn missing_blobs_api(
-    req: Json<MissingBlobsRequest>,
-) -> Result<HttpResponse, CustomError> {
+pub async fn missing_blobs_api(req: MissingBlobsRequest) -> Result<String, CustomError> {
     let agent = BskyAgent::builder().build().await.unwrap();
     login_helper(
         &agent,
@@ -244,9 +185,7 @@ pub async fn missing_blobs_api(
     }
 
     let response = serde_json::to_string(&missing_blob_cids).unwrap();
-    Ok(HttpResponse::Ok()
-        .content_type(APPLICATION_JSON)
-        .body(response))
+    Ok(response)
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -260,8 +199,7 @@ pub struct ExportBlobsRequest {
 }
 
 #[tracing::instrument]
-#[post("/export-blobs")]
-pub async fn export_blobs_api(req: Json<ExportBlobsRequest>) -> Result<HttpResponse, CustomError> {
+pub async fn export_blobs_api(req: ExportBlobsRequest) -> Result<(), CustomError> {
     let agent = BskyAgent::builder().build().await.unwrap();
     agent.configure_endpoint(req.new_pds_host.to_string());
     agent
@@ -309,8 +247,7 @@ pub async fn export_blobs_api(req: Json<ExportBlobsRequest>) -> Result<HttpRespo
             }
         }
     }
-
-    Ok(HttpResponse::Ok().content_type(APPLICATION_JSON).finish())
+    Ok(())
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -321,8 +258,7 @@ pub struct UploadBlobsRequest {
 }
 
 #[tracing::instrument]
-#[post("/upload-blobs")]
-pub async fn upload_blobs_api(req: Json<UploadBlobsRequest>) -> Result<HttpResponse, CustomError> {
+pub async fn upload_blobs_api(req: UploadBlobsRequest) -> Result<(), CustomError> {
     let agent = BskyAgent::builder().build().await.unwrap();
     agent.configure_endpoint(req.pds_host.clone());
     let session = login_helper(
@@ -348,7 +284,7 @@ pub async fn upload_blobs_api(req: Json<UploadBlobsRequest>) -> Result<HttpRespo
         upload_blob(&agent, file).await?;
     }
 
-    Ok(HttpResponse::Ok().content_type(APPLICATION_JSON).finish())
+    Ok(())
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -359,10 +295,7 @@ pub struct ActivateAccountRequest {
 }
 
 #[tracing::instrument]
-#[post("/activate-account")]
-pub async fn activate_account_api(
-    req: Json<ActivateAccountRequest>,
-) -> Result<HttpResponse, CustomError> {
+pub async fn activate_account_api(req: ActivateAccountRequest) -> Result<(), CustomError> {
     let agent = BskyAgent::builder().build().await.unwrap();
     login_helper(
         &agent,
@@ -372,7 +305,7 @@ pub async fn activate_account_api(
     )
     .await?;
     activate_account(&agent).await?;
-    Ok(HttpResponse::Ok().content_type(APPLICATION_JSON).finish())
+    Ok(())
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -386,10 +319,7 @@ pub struct DeactivateAccountRequest {
 pub struct DeactivateAccountResponse {}
 
 #[tracing::instrument]
-#[post("/deactivate-account")]
-pub async fn deactivate_account_api(
-    req: Json<DeactivateAccountRequest>,
-) -> Result<HttpResponse, CustomError> {
+pub async fn deactivate_account_api(req: DeactivateAccountRequest) -> Result<(), CustomError> {
     let agent = BskyAgent::builder().build().await.unwrap();
     login_helper(
         &agent,
@@ -399,7 +329,7 @@ pub async fn deactivate_account_api(
     )
     .await?;
     deactivate_account(&agent).await?;
-    Ok(HttpResponse::Ok().content_type(APPLICATION_JSON).finish())
+    Ok(())
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -413,10 +343,7 @@ pub struct MigratePreferencesRequest {
 }
 
 #[tracing::instrument]
-#[post("/migrate-preferences")]
-pub async fn migrate_preferences_api(
-    req: Json<MigratePreferencesRequest>,
-) -> Result<HttpResponse, CustomError> {
+pub async fn migrate_preferences_api(req: MigratePreferencesRequest) -> Result<(), CustomError> {
     let agent = BskyAgent::builder().build().await.unwrap();
     login_helper(
         &agent,
@@ -432,7 +359,7 @@ pub async fn migrate_preferences_api(
         .await
         .unwrap();
     import_preferences(&agent, preferences).await?;
-    Ok(HttpResponse::Ok().content_type(APPLICATION_JSON).finish())
+    Ok(())
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -443,10 +370,7 @@ pub struct RequestTokenRequest {
 }
 
 #[tracing::instrument]
-#[post("/request-token")]
-pub async fn request_token_api(
-    req: Json<RequestTokenRequest>,
-) -> Result<HttpResponse, CustomError> {
+pub async fn request_token_api(req: RequestTokenRequest) -> Result<(), CustomError> {
     let agent = BskyAgent::builder().build().await.unwrap();
     login_helper(
         &agent,
@@ -456,7 +380,7 @@ pub async fn request_token_api(
     )
     .await?;
     request_token(&agent).await?;
-    Ok(HttpResponse::Ok().content_type(APPLICATION_JSON).finish())
+    Ok(())
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -473,8 +397,7 @@ pub struct MigratePlcRequest {
 }
 
 #[tracing::instrument(skip(req))]
-#[post("/migrate-plc")]
-pub async fn migrate_plc_api(req: Json<MigratePlcRequest>) -> Result<HttpResponse, CustomError> {
+pub async fn migrate_plc_api(req: MigratePlcRequest) -> Result<(), CustomError> {
     let agent = BskyAgent::builder().build().await.unwrap();
     agent.configure_endpoint(req.new_pds_host.to_string());
     agent
@@ -511,6 +434,5 @@ pub async fn migrate_plc_api(req: Json<MigratePlcRequest>) -> Result<HttpRespons
         .await
         .unwrap();
     submit_plc(&agent, output).await?;
-
-    Ok(HttpResponse::Ok().content_type(APPLICATION_JSON).finish())
+    Ok(())
 }
