@@ -7,11 +7,8 @@ use crate::agent::login_helper;
 use bsky_sdk::api::agent::atp_agent::AtpSession;
 use bsky_sdk::BskyAgent;
 use eframe::egui;
-use egui::accesskit::Role::Log;
 use egui::TextBuffer;
-use pdsmigration_common::{
-    CreateAccountApiRequest, ExportPDSRequest, ImportPDSRequest, ServiceAuthRequest,
-};
+use pdsmigration_common::{ActivateAccountRequest, CreateAccountApiRequest, DeactivateAccountRequest, ExportBlobsRequest, ExportPDSRequest, ImportPDSRequest, MigratePlcRequest, MigratePreferencesRequest, RequestTokenRequest, ServiceAuthRequest, UploadBlobsRequest};
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 use tokio::runtime::Runtime;
@@ -195,42 +192,47 @@ impl eframe::App for PdsMigrationApp {
                         });
                         ui.horizontal(|ui| {
                             if ui.button("Export Repo").clicked() {
-                                self.page = Page::ExportRepo;
+                                export_repo(self, self.tx.clone(), ctx.clone());
                             }
                         });
                         ui.horizontal(|ui| {
                             if ui.button("Import Repo").clicked() {
-                                self.page = Page::ImportRepo;
+                                import_repo(self, self.tx.clone(), ctx.clone());
                             }
                         });
                         ui.horizontal(|ui| {
                             if ui.button("Export Blobs").clicked() {
-                                self.page = Page::ExportBlobs;
+                                export_blobs(self, self.tx.clone(), ctx.clone());
                             }
                         });
                         ui.horizontal(|ui| {
                             if ui.button("Upload Blobs").clicked() {
-                                self.page = Page::UploadBlobs;
+                                upload_blobs(self, self.tx.clone(), ctx.clone());
                             }
                         });
                         ui.horizontal(|ui| {
                             if ui.button("Migrate Preferences").clicked() {
-                                self.page = Page::MigratePreferences;
+                                migrate_preferences(self, self.tx.clone(), ctx.clone());
+                            }
+                        });
+                        ui.horizontal(|ui| {
+                            if ui.button("Request Token").clicked() {
+                                request_token(self, self.tx.clone(), ctx.clone());
                             }
                         });
                         ui.horizontal(|ui| {
                             if ui.button("Migrate PLC").clicked() {
-                                self.page = Page::MigratePLC;
+                                migrate_plc(self, self.tx.clone(), ctx.clone());
                             }
                         });
                         ui.horizontal(|ui| {
                             if ui.button("Activate Account").clicked() {
-                                self.page = Page::ActivateAccount;
+                                // activate_account(self, self.tx.clone(), ctx.clone());
                             }
                         });
                         ui.horizontal(|ui| {
                             if ui.button("Deactivate Account").clicked() {
-                                self.page = Page::DeactivateAccount;
+                                // deactivate_account(self, self.tx.clone(), ctx.clone());
                             }
                         });
                         ui.horizontal(|ui| {
@@ -337,28 +339,7 @@ impl eframe::App for PdsMigrationApp {
                         import_repo(self, self.tx.clone(), ctx.clone());
                     }
                 }
-                Page::ExportBlobs => {
-                    ui.heading("Export Blobs from Old PDSS");
-                    ui.horizontal(|ui| {
-                        ui.label("New PDS Host: ");
-                        ui.text_edit_singleline(&mut self.new_pds_host);
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Invite Code(Leave Blank if None): ");
-                        ui.text_edit_singleline(&mut self.invite_code);
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Email on new PDS: ");
-                        ui.text_edit_singleline(&mut self.new_email);
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Password on new PDS: ");
-                        ui.text_edit_singleline(&mut self.new_password);
-                    });
-                    if ui.button("Submit").clicked() {
-                        create_account(self, self.tx.clone(), ctx.clone());
-                    }
-                }
+                Page::ExportBlobs => {}
                 Page::UploadBlobs => {
                     ui.heading("Upload Blobs To New Pds");
                     ui.horizontal(|ui| {
@@ -496,6 +477,164 @@ impl eframe::App for PdsMigrationApp {
     }
 }
 
+fn migrate_plc(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
+    let did = app.did.clone().unwrap();
+    let old_pds_host = app.old_pds_host.to_string();
+    let new_pds_host = app.new_pds_host.to_string();
+    let old_token = app.old_pds_token.clone().unwrap();
+    let new_token = app.new_pds_token.clone().unwrap();
+
+    tokio::spawn(async move {
+        let request = MigratePlcRequest {
+            new_pds_host,
+            new_token,
+            old_pds_host,
+            did,
+            old_token,
+            plc_signing_token: "HKVFT-CASNC".to_string(),
+            user_recovery_key: None,
+        };
+        pdsmigration_common::migrate_plc_api(request)
+            .await
+            .unwrap();
+
+        // After parsing the response, notify the GUI thread of the increment value.
+        let _ = tx.send(1);
+        ctx.request_repaint();
+    });
+}
+
+fn request_token(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
+    let did = app.did.clone().unwrap();
+    let pds_host = app.old_pds_host.clone();
+    let token = app.old_pds_token.clone().unwrap();
+
+    tokio::spawn(async move {
+        let request = RequestTokenRequest {
+            pds_host,
+            did,
+            token,
+        };
+        pdsmigration_common::request_token_api(request)
+            .await
+            .unwrap();
+
+        // After parsing the response, notify the GUI thread of the increment value.
+        let _ = tx.send(1);
+        ctx.request_repaint();
+    });
+}
+
+fn activate_account(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
+    let did = app.did.clone().unwrap();
+    let pds_host = app.new_pds_host.to_string();
+    let token = app.new_pds_token.clone().unwrap();
+
+    tokio::spawn(async move {
+        let request = ActivateAccountRequest {
+            pds_host,
+            did,
+            token,
+        };
+        pdsmigration_common::activate_account_api(request)
+            .await
+            .unwrap();
+
+        // After parsing the response, notify the GUI thread of the increment value.
+        let _ = tx.send(1);
+        ctx.request_repaint();
+    });
+}
+fn deactivate_account(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
+    let did = app.did.clone().unwrap();
+    let pds_host = app.old_pds_host.to_string();
+    let token = app.old_pds_token.clone().unwrap();
+
+    tokio::spawn(async move {
+        let request = DeactivateAccountRequest {
+            pds_host,
+            did,
+            token,
+        };
+        pdsmigration_common::deactivate_account_api(request)
+            .await
+            .unwrap();
+
+        // After parsing the response, notify the GUI thread of the increment value.
+        let _ = tx.send(1);
+        ctx.request_repaint();
+    });
+}
+
+fn migrate_preferences(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
+    let did = app.did.clone().unwrap();
+    let old_pds_host = app.old_pds_host.to_string();
+    let new_pds_host = app.new_pds_host.to_string();
+    let old_token = app.old_pds_token.clone().unwrap();
+    let new_token = app.new_pds_token.clone().unwrap();
+
+    tokio::spawn(async move {
+        let request = MigratePreferencesRequest {
+            new_pds_host,
+            new_token,
+            old_pds_host,
+            did,
+            old_token,
+        };
+        pdsmigration_common::migrate_preferences_api(request)
+            .await
+            .unwrap();
+
+        // After parsing the response, notify the GUI thread of the increment value.
+        let _ = tx.send(1);
+        ctx.request_repaint();
+    });
+}
+
+fn export_blobs(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
+    let did = app.did.clone().unwrap();
+    let old_pds_host = app.old_pds_host.to_string();
+    let new_pds_host = app.new_pds_host.to_string();
+    let old_token = app.old_pds_token.clone().unwrap();
+    let new_token = app.new_pds_token.clone().unwrap();
+
+    tokio::spawn(async move {
+        let request = ExportBlobsRequest {
+            new_pds_host,
+            old_pds_host,
+            did,
+            old_token,
+            new_token,
+        };
+        pdsmigration_common::export_blobs_api(request)
+            .await
+            .unwrap();
+
+        // After parsing the response, notify the GUI thread of the increment value.
+        let _ = tx.send(1);
+        ctx.request_repaint();
+    });
+}
+
+fn upload_blobs(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
+    let did = app.did.clone().unwrap();
+    let pds_host = app.new_pds_host.to_string();
+    let token = app.new_pds_token.clone().unwrap();
+
+    tokio::spawn(async move {
+        let request = UploadBlobsRequest {
+            pds_host,
+            did,
+            token,
+        };
+        pdsmigration_common::upload_blobs_api(request).await.unwrap();
+
+        // After parsing the response, notify the GUI thread of the increment value.
+        let _ = tx.send(1);
+        ctx.request_repaint();
+    });
+}
+
 fn export_repo(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
     let did = app.did.clone().unwrap();
     let pds_host = app.old_pds_host.to_string();
@@ -517,8 +656,8 @@ fn export_repo(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
 
 fn import_repo(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
     let did = app.did.clone().unwrap();
-    let pds_host = app.old_pds_host.to_string();
-    let token = app.old_pds_token.clone().unwrap();
+    let pds_host = app.new_pds_host.to_string();
+    let token = app.new_pds_token.clone().unwrap();
 
     tokio::spawn(async move {
         let request = ImportPDSRequest {

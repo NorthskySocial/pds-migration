@@ -20,6 +20,7 @@ use pdsmigration_common::{
 use serde::{Deserialize, Serialize};
 use std::io::ErrorKind;
 use std::{env, io};
+use pdsmigration_common::error_code::CustomErrorType;
 
 pub const APPLICATION_JSON: &str = "application/json";
 
@@ -91,6 +92,38 @@ pub async fn export_pds_api(req: Json<ExportPDSRequest>) -> Result<HttpResponse,
 #[tracing::instrument]
 #[post("/import-repo")]
 pub async fn import_pds_api(req: Json<ImportPDSRequest>) -> Result<HttpResponse, CustomError> {
+    let endpoint_url = env::var("ENDPOINT").unwrap();
+    let config = aws_config::from_env()
+        .region("auto")
+        .endpoint_url(endpoint_url)
+        .load()
+        .await;
+    let client = aws_sdk_s3::Client::new(&config);
+    let bucket_name = "migration".to_string();
+    let file_name = req.did.as_str().to_string() + ".car";
+    let key = "migration".to_string() + req.did.as_str() + ".car";
+    let body =
+        aws_sdk_s3::primitives::ByteStream::from_path(std::path::Path::new(file_name.as_str()))
+            .await;
+    match client
+        .put_object()
+        .bucket(&bucket_name)
+        .key(&key)
+        .body(body.unwrap())
+        .send()
+        .await
+    {
+        Ok(output) => {
+            tracing::info!("{:?}", output);
+        }
+        Err(e) => {
+            tracing::error!("{:?}", e);
+            return Err(CustomError {
+                message: None,
+                err_type: CustomErrorType::ValidationError,
+            });
+        }
+    }
     pdsmigration_common::import_pds_api(req.into_inner()).await?;
     Ok(HttpResponse::Ok().content_type(APPLICATION_JSON).finish())
 }

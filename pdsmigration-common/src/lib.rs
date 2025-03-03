@@ -125,38 +125,6 @@ pub async fn import_pds_api(req: ImportPDSRequest) -> Result<(), CustomError> {
         req.token.as_str(),
     )
     .await?;
-    let endpoint_url = env::var("ENDPOINT").unwrap();
-    let config = aws_config::from_env()
-        .region("auto")
-        .endpoint_url(endpoint_url)
-        .load()
-        .await;
-    let client = aws_sdk_s3::Client::new(&config);
-    let bucket_name = "migration".to_string();
-    let file_name = session.did.as_str().to_string() + ".car";
-    let key = "migration".to_string() + session.did.as_str() + ".car";
-    let body =
-        aws_sdk_s3::primitives::ByteStream::from_path(std::path::Path::new(file_name.as_str()))
-            .await;
-    match client
-        .put_object()
-        .bucket(&bucket_name)
-        .key(&key)
-        .body(body.unwrap())
-        .send()
-        .await
-    {
-        Ok(output) => {
-            tracing::info!("{:?}", output);
-        }
-        Err(e) => {
-            tracing::error!("{:?}", e);
-            return Err(CustomError {
-                message: None,
-                err_type: CustomErrorType::ValidationError,
-            });
-        }
-    }
     account_import(&agent, (session.did.as_str().to_string() + ".car").as_str()).await?;
     Ok(())
 }
@@ -191,27 +159,28 @@ pub async fn missing_blobs_api(req: MissingBlobsRequest) -> Result<String, Custo
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ExportBlobsRequest {
     pub new_pds_host: String,
-    pub new_handle: String,
-    pub new_password: String,
     pub old_pds_host: String,
     pub did: String,
-    pub token: String,
+    pub old_token: String,
+    pub new_token: String,
 }
 
 #[tracing::instrument]
 pub async fn export_blobs_api(req: ExportBlobsRequest) -> Result<(), CustomError> {
     let agent = BskyAgent::builder().build().await.unwrap();
-    agent.configure_endpoint(req.new_pds_host.to_string());
-    agent
-        .login(req.new_handle.as_str(), req.new_password.as_str())
-        .await
-        .unwrap();
+    login_helper(
+        &agent,
+        req.new_pds_host.as_str(),
+        req.did.as_str(),
+        req.new_token.as_str(),
+    )
+    .await?;
     let missing_blobs = missing_blobs(&agent).await?;
     let session = login_helper(
         &agent,
         req.old_pds_host.as_str(),
         req.did.as_str(),
-        req.token.as_str(),
+        req.old_token.as_str(),
     )
     .await?;
     for missing_blob in &missing_blobs {
@@ -335,11 +304,10 @@ pub async fn deactivate_account_api(req: DeactivateAccountRequest) -> Result<(),
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MigratePreferencesRequest {
     pub new_pds_host: String,
-    pub new_handle: String,
-    pub new_password: String,
+    pub new_token: String,
     pub old_pds_host: String,
     pub did: String,
-    pub token: String,
+    pub old_token: String,
 }
 
 #[tracing::instrument]
@@ -349,15 +317,17 @@ pub async fn migrate_preferences_api(req: MigratePreferencesRequest) -> Result<(
         &agent,
         req.old_pds_host.as_str(),
         req.did.as_str(),
-        req.token.as_str(),
+        req.old_token.as_str(),
     )
     .await?;
     let preferences = export_preferences(&agent).await?;
-    agent.configure_endpoint(req.new_pds_host.to_string());
-    agent
-        .login(req.new_handle.as_str(), req.new_password.as_str())
-        .await
-        .unwrap();
+    login_helper(
+        &agent,
+        req.new_pds_host.as_str(),
+        req.did.as_str(),
+        req.new_token.as_str(),
+    )
+    .await?;
     import_preferences(&agent, preferences).await?;
     Ok(())
 }
@@ -386,11 +356,10 @@ pub async fn request_token_api(req: RequestTokenRequest) -> Result<(), CustomErr
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MigratePlcRequest {
     pub new_pds_host: String,
-    pub new_handle: String,
-    pub new_password: String,
+    pub new_token: String,
     pub old_pds_host: String,
     pub did: String,
-    pub token: String,
+    pub old_token: String,
     pub plc_signing_token: String,
     #[serde(skip_serializing_if = "core::option::Option::is_none")]
     pub user_recovery_key: Option<String>,
@@ -399,11 +368,13 @@ pub struct MigratePlcRequest {
 #[tracing::instrument(skip(req))]
 pub async fn migrate_plc_api(req: MigratePlcRequest) -> Result<(), CustomError> {
     let agent = BskyAgent::builder().build().await.unwrap();
-    agent.configure_endpoint(req.new_pds_host.to_string());
-    agent
-        .login(req.new_handle.as_str(), req.new_password.as_str())
-        .await
-        .unwrap();
+    login_helper(
+        &agent,
+        req.new_pds_host.as_str(),
+        req.did.as_str(),
+        req.new_token.as_str(),
+    )
+    .await?;
     let recommended_did = recommended_plc(&agent).await?;
     use bsky_sdk::api::com::atproto::identity::sign_plc_operation::InputData;
 
@@ -424,15 +395,17 @@ pub async fn migrate_plc_api(req: MigratePlcRequest) -> Result<(), CustomError> 
         &agent,
         req.old_pds_host.as_str(),
         req.did.as_str(),
-        req.token.as_str(),
+        req.old_token.as_str(),
     )
     .await?;
     let output = sign_plc(&agent, new_plc.clone()).await?;
-    agent.configure_endpoint(req.new_pds_host.to_string());
-    agent
-        .login(req.new_handle.as_str(), req.new_password.as_str())
-        .await
-        .unwrap();
+    login_helper(
+        &agent,
+        req.new_pds_host.as_str(),
+        req.did.as_str(),
+        req.new_token.as_str(),
+    )
+    .await?;
     submit_plc(&agent, output).await?;
     Ok(())
 }
