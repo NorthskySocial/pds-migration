@@ -9,8 +9,8 @@ pdsmigration-common = { workspace = true }
 tokio = { version = "1.43.0" }
 bsky-sdk = "0.1.16"
 
-egui = { version = "0.29.1" }
-eframe = { version = "0.29.1", default-features = false, features = [
+egui = { version = "0.31.0" }
+eframe = { version = "0.31.0", features = [
     "default",
     "__screenshot", # __screenshot is so we can dump a screenshot using EFRAME_SCREENSHOT_TO
 ] }

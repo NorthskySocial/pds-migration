@@ -7,8 +7,12 @@ use crate::agent::login_helper;
 use bsky_sdk::api::agent::atp_agent::AtpSession;
 use bsky_sdk::BskyAgent;
 use eframe::egui;
-use egui::TextBuffer;
-use pdsmigration_common::{ActivateAccountRequest, CreateAccountApiRequest, DeactivateAccountRequest, ExportBlobsRequest, ExportPDSRequest, ImportPDSRequest, MigratePlcRequest, MigratePreferencesRequest, RequestTokenRequest, ServiceAuthRequest, UploadBlobsRequest};
+use egui::{style, TextBuffer, Widget, Window};
+use pdsmigration_common::{
+    ActivateAccountRequest, CreateAccountApiRequest, DeactivateAccountRequest, ExportBlobsRequest,
+    ExportPDSRequest, ImportPDSRequest, MigratePlcRequest, MigratePreferencesRequest,
+    RequestTokenRequest, ServiceAuthRequest, UploadBlobsRequest,
+};
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 use tokio::runtime::Runtime;
@@ -78,6 +82,7 @@ struct PdsMigrationApp {
     did: Option<String>,
     old_pds_token: Option<String>,
     new_pds_token: Option<String>,
+    success_open: bool,
 
     username: String,
     password: String,
@@ -129,6 +134,7 @@ impl Default for PdsMigrationApp {
             did: None,
             old_pds_token: None,
             new_pds_token: None,
+            success_open: false,
             username: "".to_string(),
             password: "".to_string(),
             page: Page::Home,
@@ -154,6 +160,17 @@ impl Default for PdsMigrationApp {
 
 impl eframe::App for PdsMigrationApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        Window::new("Success")
+            .open(&mut self.success_open.clone())
+            .vscroll(false)
+            .resizable(false)
+            .show(ctx, |ui| {
+                let btn = ui.button("Ok");
+                if btn.clicked() {
+                    self.success_open = false;
+                }
+            });
+
         egui::CentralPanel::default().show(ctx, |ui| {
             if ui.button("Home").clicked() {
                 self.page = Page::Home;
@@ -253,6 +270,9 @@ impl eframe::App for PdsMigrationApp {
                                 });
                             }
                         });
+                        if ui.button("Open").clicked() {
+                            self.success_open = true;
+                        }
                     }
                 }
                 Page::OldLogin(ref mut login) => {
@@ -494,9 +514,7 @@ fn migrate_plc(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
             plc_signing_token: "HKVFT-CASNC".to_string(),
             user_recovery_key: None,
         };
-        pdsmigration_common::migrate_plc_api(request)
-            .await
-            .unwrap();
+        pdsmigration_common::migrate_plc_api(request).await.unwrap();
 
         // After parsing the response, notify the GUI thread of the increment value.
         let _ = tx.send(1);
@@ -627,7 +645,9 @@ fn upload_blobs(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
             did,
             token,
         };
-        pdsmigration_common::upload_blobs_api(request).await.unwrap();
+        pdsmigration_common::upload_blobs_api(request)
+            .await
+            .unwrap();
 
         // After parsing the response, notify the GUI thread of the increment value.
         let _ = tx.send(1);
