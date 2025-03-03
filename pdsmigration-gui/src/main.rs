@@ -7,15 +7,14 @@ use crate::agent::login_helper;
 use bsky_sdk::api::agent::atp_agent::AtpSession;
 use bsky_sdk::BskyAgent;
 use eframe::egui;
-use egui::UiKind::Popup;
-use egui::{PopupCloseBehavior, TextBuffer};
-use pdsmigration_common::{CreateAccountApiRequest, CreateAccountRequest, ServiceAuthRequest};
+use egui::TextBuffer;
+use pdsmigration_common::{CreateAccountApiRequest, ExportPDSRequest, ServiceAuthRequest};
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 use tokio::runtime::Runtime;
 
 const CHAR_LIMIT: i32 = 300;
-const DIRECTORY_NAME: &str = "AdventureNodes";
+const DIRECTORY_NAME: &str = "blobs";
 
 enum Page {
     Home,
@@ -68,7 +67,7 @@ fn main() -> eframe::Result {
     };
 
     eframe::run_native(
-        " Adventurer Nodes",
+        " PDS Migration Tool",
         options,
         Box::new(|cc| Ok(Box::<PdsMigrationApp>::default())),
     )
@@ -79,6 +78,8 @@ struct PdsMigrationApp {
     old_pds_token: Option<String>,
     new_pds_token: Option<String>,
 
+    username: String,
+    password: String,
     page: Page,
 
     old_pds_host: String,
@@ -117,8 +118,10 @@ impl Default for PdsMigrationApp {
             did: None,
             old_pds_token: None,
             new_pds_token: None,
+            username: "".to_string(),
+            password: "".to_string(),
             page: Page::Home,
-            old_pds_host: "".to_string(),
+            old_pds_host: "https://bsky.social".to_string(),
             new_pds_host: "".to_string(),
             new_handle: "".to_string(),
             invite_code: "".to_string(),
@@ -137,6 +140,9 @@ impl Default for PdsMigrationApp {
 impl eframe::App for PdsMigrationApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
+            if ui.button("Home").clicked() {
+                self.page = Page::Home;
+            }
             let res = self.login_rx.try_recv();
             if res.is_ok() {
                 let session = res.unwrap();
@@ -151,6 +157,55 @@ impl eframe::App for PdsMigrationApp {
                         ui.horizontal(|ui| {
                             if ui.button("Create Account").clicked() {
                                 self.page = Page::CreateAccount;
+                            }
+                        });
+                        ui.horizontal(|ui| {
+                            if ui.button("Export Repo").clicked() {
+                                self.page = Page::ExportRepo;
+                            }
+                        });
+                        ui.horizontal(|ui| {
+                            if ui.button("Import Repo").clicked() {
+                                self.page = Page::ImportRepo;
+                            }
+                        });
+                        ui.horizontal(|ui| {
+                            if ui.button("Export Blobs").clicked() {
+                                self.page = Page::ExportBlobs;
+                            }
+                        });
+                        ui.horizontal(|ui| {
+                            if ui.button("Upload Blobs").clicked() {
+                                self.page = Page::UploadBlobs;
+                            }
+                        });
+                        ui.horizontal(|ui| {
+                            if ui.button("Migrate Preferences").clicked() {
+                                self.page = Page::MigratePreferences;
+                            }
+                        });
+                        ui.horizontal(|ui| {
+                            if ui.button("Migrate PLC").clicked() {
+                                self.page = Page::MigratePLC;
+                            }
+                        });
+                        ui.horizontal(|ui| {
+                            if ui.button("Activate Account").clicked() {
+                                self.page = Page::ActivateAccount;
+                            }
+                        });
+                        ui.horizontal(|ui| {
+                            if ui.button("Deactivate Account").clicked() {
+                                self.page = Page::DeactivateAccount;
+                            }
+                        });
+                        ui.horizontal(|ui| {
+                            if ui.button("Login").clicked() {
+                                self.page = Page::Login(Login {
+                                    old_pds_host: "https://bsky.social".to_string(),
+                                    username: "".to_string(),
+                                    password: "".to_string(),
+                                });
                             }
                         });
                     } else {
@@ -168,23 +223,55 @@ impl eframe::App for PdsMigrationApp {
                 Page::Login(ref mut login) => {
                     ui.heading("Login");
                     ui.horizontal(|ui| {
-                        ui.label("Old PDS: ");
-                        ui.text_edit_singleline(&mut login.old_pds_host);
+                        ui.label("PDS: ");
+                        ui.text_edit_singleline(&mut self.old_pds_host);
                     });
                     ui.horizontal(|ui| {
                         ui.label("Username: ");
-                        ui.text_edit_singleline(&mut login.username);
+                        ui.text_edit_singleline(&mut self.username);
                     });
                     ui.horizontal(|ui| {
                         ui.label("Password: ");
-                        ui.text_edit_singleline(&mut login.password);
+                        ui.add(egui::TextEdit::singleline(&mut self.password).password(true));
                     });
                     if ui.button("Submit").clicked() {
-                        session_login(login, self.tx.clone(), self.login_tx.clone(), ctx.clone());
+                        session_login(self, self.tx.clone(), self.login_tx.clone(), ctx.clone());
                     }
                 }
                 Page::CreateAccount => {
                     ui.heading("Create Account On New PDS");
+                    ui.horizontal(|ui| {
+                        ui.label("New PDS Host: ");
+                        ui.text_edit_singleline(&mut self.new_pds_host);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Invite Code(Leave Blank if None): ");
+                        ui.text_edit_singleline(&mut self.invite_code);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Handle on new PDS: ");
+                        ui.text_edit_singleline(&mut self.new_handle);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Email on new PDS: ");
+                        ui.text_edit_singleline(&mut self.new_email);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Password on new PDS: ");
+                        ui.add(egui::TextEdit::singleline(&mut self.new_password).password(true));
+                    });
+                    if ui.button("Submit").clicked() {
+                        create_account(self, self.tx.clone(), ctx.clone());
+                    }
+                }
+                Page::ExportRepo => {
+                    ui.heading("Export Repo");
+                    if ui.button("Submit").clicked() {
+                        export_repo(self, self.tx.clone(), ctx.clone());
+                    }
+                }
+                Page::ImportRepo => {
+                    ui.heading("Import Repo To New Pds");
                     ui.horizontal(|ui| {
                         ui.label("New PDS Host: ");
                         ui.text_edit_singleline(&mut self.new_pds_host);
@@ -205,34 +292,200 @@ impl eframe::App for PdsMigrationApp {
                         create_account(self, self.tx.clone(), ctx.clone());
                     }
                 }
-                Page::ExportRepo => {}
-                Page::ImportRepo => {}
-                Page::ExportBlobs => {}
-                Page::UploadBlobs => {}
-                Page::MigratePreferences => {}
-                Page::RequestToken => {}
-                Page::MigratePLC => {}
-                Page::ActivateAccount => {}
-                Page::DeactivateAccount => {}
+                Page::ExportBlobs => {
+                    ui.heading("Export Blobs from Old PDSS");
+                    ui.horizontal(|ui| {
+                        ui.label("New PDS Host: ");
+                        ui.text_edit_singleline(&mut self.new_pds_host);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Invite Code(Leave Blank if None): ");
+                        ui.text_edit_singleline(&mut self.invite_code);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Email on new PDS: ");
+                        ui.text_edit_singleline(&mut self.new_email);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Password on new PDS: ");
+                        ui.text_edit_singleline(&mut self.new_password);
+                    });
+                    if ui.button("Submit").clicked() {
+                        create_account(self, self.tx.clone(), ctx.clone());
+                    }
+                }
+                Page::UploadBlobs => {
+                    ui.heading("Upload Blobs To New Pds");
+                    ui.horizontal(|ui| {
+                        ui.label("New PDS Host: ");
+                        ui.text_edit_singleline(&mut self.new_pds_host);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Invite Code(Leave Blank if None): ");
+                        ui.text_edit_singleline(&mut self.invite_code);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Email on new PDS: ");
+                        ui.text_edit_singleline(&mut self.new_email);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Password on new PDS: ");
+                        ui.text_edit_singleline(&mut self.new_password);
+                    });
+                    if ui.button("Submit").clicked() {
+                        create_account(self, self.tx.clone(), ctx.clone());
+                    }
+                }
+                Page::MigratePreferences => {
+                    ui.heading("Migrate Preferences");
+                    ui.horizontal(|ui| {
+                        ui.label("New PDS Host: ");
+                        ui.text_edit_singleline(&mut self.new_pds_host);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Invite Code(Leave Blank if None): ");
+                        ui.text_edit_singleline(&mut self.invite_code);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Email on new PDS: ");
+                        ui.text_edit_singleline(&mut self.new_email);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Password on new PDS: ");
+                        ui.text_edit_singleline(&mut self.new_password);
+                    });
+                    if ui.button("Submit").clicked() {
+                        create_account(self, self.tx.clone(), ctx.clone());
+                    }
+                }
+                Page::RequestToken => {
+                    ui.heading("Request Token");
+                    ui.horizontal(|ui| {
+                        ui.label("New PDS Host: ");
+                        ui.text_edit_singleline(&mut self.new_pds_host);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Invite Code(Leave Blank if None): ");
+                        ui.text_edit_singleline(&mut self.invite_code);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Email on new PDS: ");
+                        ui.text_edit_singleline(&mut self.new_email);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Password on new PDS: ");
+                        ui.text_edit_singleline(&mut self.new_password);
+                    });
+                    if ui.button("Submit").clicked() {
+                        create_account(self, self.tx.clone(), ctx.clone());
+                    }
+                }
+                Page::MigratePLC => {
+                    ui.heading("Migrate PLC");
+                    ui.horizontal(|ui| {
+                        ui.label("New PDS Host: ");
+                        ui.text_edit_singleline(&mut self.new_pds_host);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Invite Code(Leave Blank if None): ");
+                        ui.text_edit_singleline(&mut self.invite_code);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Email on new PDS: ");
+                        ui.text_edit_singleline(&mut self.new_email);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Password on new PDS: ");
+                        ui.text_edit_singleline(&mut self.new_password);
+                    });
+                    if ui.button("Submit").clicked() {
+                        create_account(self, self.tx.clone(), ctx.clone());
+                    }
+                }
+                Page::ActivateAccount => {
+                    ui.heading("Activate Account");
+                    ui.horizontal(|ui| {
+                        ui.label("New PDS Host: ");
+                        ui.text_edit_singleline(&mut self.new_pds_host);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Invite Code(Leave Blank if None): ");
+                        ui.text_edit_singleline(&mut self.invite_code);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Email on new PDS: ");
+                        ui.text_edit_singleline(&mut self.new_email);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Password on new PDS: ");
+                        ui.text_edit_singleline(&mut self.new_password);
+                    });
+                    if ui.button("Submit").clicked() {
+                        create_account(self, self.tx.clone(), ctx.clone());
+                    }
+                }
+                Page::DeactivateAccount => {
+                    ui.heading("Deactivate Account");
+                    ui.horizontal(|ui| {
+                        ui.label("New PDS Host: ");
+                        ui.text_edit_singleline(&mut self.new_pds_host);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Invite Code(Leave Blank if None): ");
+                        ui.text_edit_singleline(&mut self.invite_code);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Email on new PDS: ");
+                        ui.text_edit_singleline(&mut self.new_email);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Password on new PDS: ");
+                        ui.text_edit_singleline(&mut self.new_password);
+                    });
+                    if ui.button("Submit").clicked() {
+                        create_account(self, self.tx.clone(), ctx.clone());
+                    }
+                }
             }
         });
     }
 }
 
+fn export_repo(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
+    let did = app.did.clone().unwrap();
+    let pds_host = app.old_pds_host.to_string();
+    let token = app.old_pds_token.clone().unwrap();
+
+    tokio::spawn(async move {
+        let request = ExportPDSRequest {
+            pds_host,
+            did,
+            token,
+        };
+        pdsmigration_common::export_pds_api(request).await.unwrap();
+
+        // After parsing the response, notify the GUI thread of the increment value.
+        let _ = tx.send(1);
+        ctx.request_repaint();
+    });
+}
+
 fn create_account(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
     let did = app.did.clone().unwrap();
+    let token = app.old_pds_token.clone().unwrap().to_string();
     let email = app.new_email.clone();
-    let pds_host = app.new_pds_host.clone();
+    let pds_host = app.old_pds_host.clone();
+    let new_pds_host = app.new_pds_host.clone();
     let password = app.new_password.clone();
     let invite_code = app.invite_code.clone();
     let handle = app.new_handle.clone();
 
     tokio::spawn(async move {
         let service_auth_request = ServiceAuthRequest {
-            pds_host: "".to_string(),
-            aud: "".to_string(),
-            did: "".to_string(),
-            token: "".to_string(),
+            pds_host: pds_host.clone(),
+            aud: "did:web:pds.ripperoni.com".to_string(),
+            did: did.clone(),
+            token: token.clone(),
         };
         let token = pdsmigration_common::get_service_auth_api(service_auth_request)
             .await
@@ -244,10 +497,12 @@ fn create_account(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
             invite_code,
             password,
             token,
-            pds_host,
+            pds_host: new_pds_host,
             did,
         };
-        pdsmigration_common::create_account_api(create_account_request).await.unwrap();
+        pdsmigration_common::create_account_api(create_account_request)
+            .await
+            .unwrap();
 
         // After parsing the response, notify the GUI thread of the increment value.
         let _ = tx.send(1);
@@ -255,10 +510,10 @@ fn create_account(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
     });
 }
 
-fn session_login(login: &Login, tx: Sender<u32>, login_tx: Sender<AtpSession>, ctx: egui::Context) {
-    let old_pds_host = login.old_pds_host.to_string();
-    let username = login.username.to_string();
-    let password = login.password.to_string();
+fn session_login(app: &PdsMigrationApp, tx: Sender<u32>, login_tx: Sender<AtpSession>, ctx: egui::Context) {
+    let old_pds_host = app.old_pds_host.to_string();
+    let username = app.username.to_string();
+    let password = app.password.to_string();
     tokio::spawn(async move {
         let bsky_agent = BskyAgent::builder().build().await.unwrap();
         let session = login_helper(
