@@ -15,14 +15,10 @@ pub async fn login_helper(
 ) -> Result<AtpSession, CustomError> {
     agent.configure_endpoint(pds_host.to_string());
     match agent.login(username, password).await {
-        Ok(res) => {
-            Ok(res)
-        }
-        Err(e) => {
-            Err(CustomError {
-                message: Some("Failed to login".to_string()),
-                err_type: CustomErrorType::LoginError,
-            })
-        }
+        Ok(res) => Ok(res),
+        Err(e) => Err(CustomError {
+            message: Some("Failed to login".to_string()),
+            err_type: CustomErrorType::LoginError,
+        }),
     }
 }

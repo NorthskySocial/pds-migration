@@ -24,7 +24,7 @@ impl From<pdsmigration_common::error_code::CustomError> for CustomError {
             err_type: value.err_type,
         }
     }
-} 
+}
 
 impl std::fmt::Display for CustomError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -43,4 +43,3 @@ impl ResponseError for CustomError {
         HttpResponse::build(self.status_code()).json(self.message.clone())
     }
 }
-

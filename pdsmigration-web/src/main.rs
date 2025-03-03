@@ -11,6 +11,7 @@ use pdsmigration_common::agent::{
     export_preferences, get_blob, get_service_auth, import_preferences, login_helper,
     missing_blobs, recommended_plc, request_token, sign_plc, submit_plc, upload_blob,
 };
+use pdsmigration_common::error_code::CustomErrorType;
 use pdsmigration_common::{
     ActivateAccountRequest, CreateAccountApiRequest, CreateAccountRequest,
     DeactivateAccountRequest, ExportBlobsRequest, ExportPDSRequest, ImportPDSRequest,
@@ -20,7 +21,6 @@ use pdsmigration_common::{
 use serde::{Deserialize, Serialize};
 use std::io::ErrorKind;
 use std::{env, io};
-use pdsmigration_common::error_code::CustomErrorType;
 
 pub const APPLICATION_JSON: &str = "application/json";
 
