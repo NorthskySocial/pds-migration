@@ -7,7 +7,7 @@ use crate::agent::login_helper;
 use bsky_sdk::api::agent::atp_agent::AtpSession;
 use bsky_sdk::BskyAgent;
 use eframe::egui;
-use egui::{style, TextBuffer, Widget, Window};
+use egui::{TextBuffer, Widget, Window};
 use pdsmigration_common::{
     ActivateAccountRequest, CreateAccountApiRequest, DeactivateAccountRequest, ExportBlobsRequest,
     ExportPDSRequest, ImportPDSRequest, MigratePlcRequest, MigratePreferencesRequest,
@@ -25,15 +25,6 @@ enum Page {
     OldLogin(Login),
     NewLogin(Login),
     CreateAccount,
-    ExportRepo,
-    ImportRepo,
-    ExportBlobs,
-    UploadBlobs,
-    MigratePreferences,
-    RequestToken,
-    MigratePLC,
-    ActivateAccount,
-    DeactivateAccount,
 }
 
 struct Login {
@@ -83,10 +74,14 @@ struct PdsMigrationApp {
     old_pds_token: Option<String>,
     new_pds_token: Option<String>,
     success_open: bool,
+    error_open: bool,
 
     username: String,
     password: String,
     page: Page,
+
+    plc_token: String,
+    user_recovery_key: String,
 
     old_pds_host: String,
     new_pds_host: String,
@@ -135,9 +130,12 @@ impl Default for PdsMigrationApp {
             old_pds_token: None,
             new_pds_token: None,
             success_open: false,
+            error_open: false,
             username: "".to_string(),
             password: "".to_string(),
             page: Page::Home,
+            plc_token: "".to_string(),
+            user_recovery_key: "".to_string(),
             old_pds_host: "https://bsky.social".to_string(),
             new_pds_host: "https://pds.ripperoni.com".to_string(),
             new_handle: "".to_string(),
@@ -170,11 +168,18 @@ impl eframe::App for PdsMigrationApp {
                     self.success_open = false;
                 }
             });
+        Window::new("Error")
+            .open(&mut self.error_open.clone())
+            .vscroll(false)
+            .resizable(false)
+            .show(ctx, |ui| {
+                let btn = ui.button("Ok");
+                if btn.clicked() {
+                    self.error_open = false;
+                }
+            });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            if ui.button("Home").clicked() {
-                self.page = Page::Home;
-            }
             let res = self.login_rx.try_recv();
             if res.is_ok() {
                 let session = res.unwrap();
@@ -182,6 +187,7 @@ impl eframe::App for PdsMigrationApp {
                 self.old_pds_token = Some(session.access_jwt.clone());
                 self.page = Page::Home;
             }
+
             let res = self.new_login_rx.try_recv();
             if res.is_ok() {
                 let session = res.unwrap();
@@ -190,76 +196,109 @@ impl eframe::App for PdsMigrationApp {
                 self.page = Page::Home;
             }
 
+            let res = self.rx.try_recv();
+            if let Ok(res) = res {
+                if res == 1 {
+                    self.success_open = true;
+                } else if res == 2 {
+                    self.error_open = true;
+                }
+            }
+
             match &mut self.page {
                 Page::Home => {
-                    if self.did.is_some() {
-                        ui.horizontal(|ui| {
-                            if ui.button("Login to New PDS").clicked() {
-                                self.page = Page::NewLogin(Login {
-                                    pds_host: "https://pds.ripperoni.com".to_string(),
-                                    username: "".to_string(),
-                                    password: "".to_string(),
+                    if self.old_pds_token.is_some() {
+                        if self.new_pds_token.is_none() {
+                            ui.horizontal(|ui| {
+                                if ui.button("Login to New PDS").clicked() {
+                                    self.page = Page::NewLogin(Login {
+                                        pds_host: "https://pds.ripperoni.com".to_string(),
+                                        username: "".to_string(),
+                                        password: "".to_string(),
+                                    });
+                                }
+                            });
+                            ui.horizontal(|ui| {
+                                if ui.button("Create Account").clicked() {
+                                    self.page = Page::CreateAccount;
+                                }
+                            });
+                        } else {
+                            ui.horizontal(|ui| {
+                                if ui.button("Export Repo").clicked() {
+                                    export_repo(self, self.tx.clone(), ctx.clone());
+                                }
+                            });
+                            ui.separator();
+                            ui.horizontal(|ui| {
+                                if ui.button("Import Repo").clicked() {
+                                    import_repo(self, self.tx.clone(), ctx.clone());
+                                }
+                            });
+                            ui.separator();
+                            ui.horizontal(|ui| {
+                                if ui.button("Export Blobs").clicked() {
+                                    export_blobs(self, self.tx.clone(), ctx.clone());
+                                }
+                            });
+                            ui.separator();
+                            ui.horizontal(|ui| {
+                                if ui.button("Upload Blobs").clicked() {
+                                    upload_blobs(self, self.tx.clone(), ctx.clone());
+                                }
+                            });
+                            ui.separator();
+                            ui.horizontal(|ui| {
+                                if ui.button("Migrate Preferences").clicked() {
+                                    migrate_preferences(self, self.tx.clone(), ctx.clone());
+                                }
+                            });
+                            ui.separator();
+                            ui.horizontal(|ui| {
+                                if ui.button("Request Token").clicked() {
+                                    request_token(self, self.tx.clone(), ctx.clone());
+                                }
+                            });
+                            ui.separator();
+                            ui.horizontal(|ui| {
+                                ui.horizontal(|ui| {
+                                    ui.vertical(|ui| {
+                                        ui.label("PLC Signing Token");
+                                        ui.text_edit_singleline(&mut self.plc_token);
+                                    });
+                                    ui.vertical(|ui| {
+                                        ui.label("User Recovery Key (optional)");
+                                        ui.text_edit_singleline(&mut self.plc_token);
+                                    });
+                                    ui.vertical(|ui| {
+                                        if ui.button("Migrate PLC").clicked() {
+                                            migrate_plc(self, self.tx.clone(), ctx.clone());
+                                        }
+                                    });
                                 });
-                            }
-                        });
-                        ui.horizontal(|ui| {
-                            if ui.button("Create Account").clicked() {
-                                self.page = Page::CreateAccount;
-                            }
-                        });
-                        ui.horizontal(|ui| {
-                            if ui.button("Export Repo").clicked() {
-                                export_repo(self, self.tx.clone(), ctx.clone());
-                            }
-                        });
-                        ui.horizontal(|ui| {
-                            if ui.button("Import Repo").clicked() {
-                                import_repo(self, self.tx.clone(), ctx.clone());
-                            }
-                        });
-                        ui.horizontal(|ui| {
-                            if ui.button("Export Blobs").clicked() {
-                                export_blobs(self, self.tx.clone(), ctx.clone());
-                            }
-                        });
-                        ui.horizontal(|ui| {
-                            if ui.button("Upload Blobs").clicked() {
-                                upload_blobs(self, self.tx.clone(), ctx.clone());
-                            }
-                        });
-                        ui.horizontal(|ui| {
-                            if ui.button("Migrate Preferences").clicked() {
-                                migrate_preferences(self, self.tx.clone(), ctx.clone());
-                            }
-                        });
-                        ui.horizontal(|ui| {
-                            if ui.button("Request Token").clicked() {
-                                request_token(self, self.tx.clone(), ctx.clone());
-                            }
-                        });
-                        ui.horizontal(|ui| {
-                            if ui.button("Migrate PLC").clicked() {
-                                migrate_plc(self, self.tx.clone(), ctx.clone());
-                            }
-                        });
-                        ui.horizontal(|ui| {
-                            if ui.button("Activate Account").clicked() {
-                                // activate_account(self, self.tx.clone(), ctx.clone());
-                            }
-                        });
-                        ui.horizontal(|ui| {
-                            if ui.button("Deactivate Account").clicked() {
-                                // deactivate_account(self, self.tx.clone(), ctx.clone());
-                            }
-                        });
-                        ui.horizontal(|ui| {
-                            if self.old_pds_token.is_some() {
-                                ui.label("Old PDS Status: Logged In");
-                            }
-                            if self.new_pds_token.is_some() {
-                                ui.label("New PDS Status: Logged In");
-                            }
-                        });
+                            });
+                            ui.separator();
+                            ui.horizontal(|ui| {
+                                if ui.button("Activate Account").clicked() {
+                                    // activate_account(self, self.tx.clone(), ctx.clone());
+                                }
+                            });
+                            ui.separator();
+                            ui.horizontal(|ui| {
+                                if ui.button("Deactivate Account").clicked() {
+                                    // deactivate_account(self, self.tx.clone(), ctx.clone());
+                                }
+                            });
+                            ui.separator();
+                            ui.horizontal(|ui| {
+                                if self.old_pds_token.is_some() {
+                                    ui.label("Old PDS Status: Logged In");
+                                }
+                                if self.new_pds_token.is_some() {
+                                    ui.label("New PDS Status: Logged In");
+                                }
+                            });
+                        }
                     } else {
                         ui.horizontal(|ui| {
                             if ui.button("Old Login").clicked() {
@@ -270,9 +309,6 @@ impl eframe::App for PdsMigrationApp {
                                 });
                             }
                         });
-                        if ui.button("Open").clicked() {
-                            self.success_open = true;
-                        }
                     }
                 }
                 Page::OldLogin(ref mut login) => {
@@ -347,151 +383,6 @@ impl eframe::App for PdsMigrationApp {
                         create_account(self, self.tx.clone(), ctx.clone());
                     }
                 }
-                Page::ExportRepo => {
-                    ui.heading("Export Repo");
-                    if ui.button("Submit").clicked() {
-                        export_repo(self, self.tx.clone(), ctx.clone());
-                    }
-                }
-                Page::ImportRepo => {
-                    ui.heading("Import Repo");
-                    if ui.button("Submit").clicked() {
-                        import_repo(self, self.tx.clone(), ctx.clone());
-                    }
-                }
-                Page::ExportBlobs => {}
-                Page::UploadBlobs => {
-                    ui.heading("Upload Blobs To New Pds");
-                    ui.horizontal(|ui| {
-                        ui.label("New PDS Host: ");
-                        ui.text_edit_singleline(&mut self.new_pds_host);
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Invite Code(Leave Blank if None): ");
-                        ui.text_edit_singleline(&mut self.invite_code);
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Email on new PDS: ");
-                        ui.text_edit_singleline(&mut self.new_email);
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Password on new PDS: ");
-                        ui.text_edit_singleline(&mut self.new_password);
-                    });
-                    if ui.button("Submit").clicked() {
-                        create_account(self, self.tx.clone(), ctx.clone());
-                    }
-                }
-                Page::MigratePreferences => {
-                    ui.heading("Migrate Preferences");
-                    ui.horizontal(|ui| {
-                        ui.label("New PDS Host: ");
-                        ui.text_edit_singleline(&mut self.new_pds_host);
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Invite Code(Leave Blank if None): ");
-                        ui.text_edit_singleline(&mut self.invite_code);
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Email on new PDS: ");
-                        ui.text_edit_singleline(&mut self.new_email);
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Password on new PDS: ");
-                        ui.text_edit_singleline(&mut self.new_password);
-                    });
-                    if ui.button("Submit").clicked() {
-                        create_account(self, self.tx.clone(), ctx.clone());
-                    }
-                }
-                Page::RequestToken => {
-                    ui.heading("Request Token");
-                    ui.horizontal(|ui| {
-                        ui.label("New PDS Host: ");
-                        ui.text_edit_singleline(&mut self.new_pds_host);
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Invite Code(Leave Blank if None): ");
-                        ui.text_edit_singleline(&mut self.invite_code);
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Email on new PDS: ");
-                        ui.text_edit_singleline(&mut self.new_email);
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Password on new PDS: ");
-                        ui.text_edit_singleline(&mut self.new_password);
-                    });
-                    if ui.button("Submit").clicked() {
-                        create_account(self, self.tx.clone(), ctx.clone());
-                    }
-                }
-                Page::MigratePLC => {
-                    ui.heading("Migrate PLC");
-                    ui.horizontal(|ui| {
-                        ui.label("New PDS Host: ");
-                        ui.text_edit_singleline(&mut self.new_pds_host);
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Invite Code(Leave Blank if None): ");
-                        ui.text_edit_singleline(&mut self.invite_code);
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Email on new PDS: ");
-                        ui.text_edit_singleline(&mut self.new_email);
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Password on new PDS: ");
-                        ui.text_edit_singleline(&mut self.new_password);
-                    });
-                    if ui.button("Submit").clicked() {
-                        create_account(self, self.tx.clone(), ctx.clone());
-                    }
-                }
-                Page::ActivateAccount => {
-                    ui.heading("Activate Account");
-                    ui.horizontal(|ui| {
-                        ui.label("New PDS Host: ");
-                        ui.text_edit_singleline(&mut self.new_pds_host);
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Invite Code(Leave Blank if None): ");
-                        ui.text_edit_singleline(&mut self.invite_code);
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Email on new PDS: ");
-                        ui.text_edit_singleline(&mut self.new_email);
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Password on new PDS: ");
-                        ui.text_edit_singleline(&mut self.new_password);
-                    });
-                    if ui.button("Submit").clicked() {
-                        create_account(self, self.tx.clone(), ctx.clone());
-                    }
-                }
-                Page::DeactivateAccount => {
-                    ui.heading("Deactivate Account");
-                    ui.horizontal(|ui| {
-                        ui.label("New PDS Host: ");
-                        ui.text_edit_singleline(&mut self.new_pds_host);
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Invite Code(Leave Blank if None): ");
-                        ui.text_edit_singleline(&mut self.invite_code);
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Email on new PDS: ");
-                        ui.text_edit_singleline(&mut self.new_email);
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Password on new PDS: ");
-                        ui.text_edit_singleline(&mut self.new_password);
-                    });
-                    if ui.button("Submit").clicked() {
-                        create_account(self, self.tx.clone(), ctx.clone());
-                    }
-                }
             }
         });
     }
@@ -503,6 +394,11 @@ fn migrate_plc(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
     let new_pds_host = app.new_pds_host.to_string();
     let old_token = app.old_pds_token.clone().unwrap();
     let new_token = app.new_pds_token.clone().unwrap();
+    let plc_signing_token = app.plc_token.clone();
+    let user_recovery_key = match app.user_recovery_key.is_empty() {
+        true => None,
+        false => Some(app.user_recovery_key.clone()),
+    };
 
     tokio::spawn(async move {
         let request = MigratePlcRequest {
@@ -511,13 +407,17 @@ fn migrate_plc(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
             old_pds_host,
             did,
             old_token,
-            plc_signing_token: "HKVFT-CASNC".to_string(),
-            user_recovery_key: None,
+            plc_signing_token,
+            user_recovery_key,
         };
-        pdsmigration_common::migrate_plc_api(request).await.unwrap();
-
-        // After parsing the response, notify the GUI thread of the increment value.
-        let _ = tx.send(1);
+        match pdsmigration_common::migrate_plc_api(request).await {
+            Ok(_) => {
+                let _ = tx.send(1);
+            }
+            Err(_) => {
+                let _ = tx.send(2);
+            }
+        }
         ctx.request_repaint();
     });
 }
@@ -533,12 +433,15 @@ fn request_token(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
             did,
             token,
         };
-        pdsmigration_common::request_token_api(request)
-            .await
-            .unwrap();
+        match pdsmigration_common::request_token_api(request).await {
+            Ok(_) => {
+                let _ = tx.send(1);
+            }
+            Err(_) => {
+                let _ = tx.send(2);
+            }
+        }
 
-        // After parsing the response, notify the GUI thread of the increment value.
-        let _ = tx.send(1);
         ctx.request_repaint();
     });
 }
@@ -554,13 +457,18 @@ fn activate_account(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) 
             did,
             token,
         };
-        pdsmigration_common::activate_account_api(request)
-            .await
-            .unwrap();
-
-        // After parsing the response, notify the GUI thread of the increment value.
-        let _ = tx.send(1);
-        ctx.request_repaint();
+        match pdsmigration_common::activate_account_api(request).await {
+            Ok(_) => {
+                // After parsing the response, notify the GUI thread of the increment value.
+                let _ = tx.send(1);
+                ctx.request_repaint();
+            }
+            Err(_) => {
+                // After parsing the response, notify the GUI thread of the increment value.
+                let _ = tx.send(2);
+                ctx.request_repaint();
+            }
+        }
     });
 }
 fn deactivate_account(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
@@ -574,13 +482,18 @@ fn deactivate_account(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context
             did,
             token,
         };
-        pdsmigration_common::deactivate_account_api(request)
-            .await
-            .unwrap();
-
-        // After parsing the response, notify the GUI thread of the increment value.
-        let _ = tx.send(1);
-        ctx.request_repaint();
+        match pdsmigration_common::deactivate_account_api(request).await {
+            Ok(_) => {
+                // After parsing the response, notify the GUI thread of the increment value.
+                let _ = tx.send(1);
+                ctx.request_repaint();
+            }
+            Err(_) => {
+                // After parsing the response, notify the GUI thread of the increment value.
+                let _ = tx.send(2);
+                ctx.request_repaint();
+            }
+        }
     });
 }
 
@@ -599,13 +512,18 @@ fn migrate_preferences(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Contex
             did,
             old_token,
         };
-        pdsmigration_common::migrate_preferences_api(request)
-            .await
-            .unwrap();
-
-        // After parsing the response, notify the GUI thread of the increment value.
-        let _ = tx.send(1);
-        ctx.request_repaint();
+        match pdsmigration_common::migrate_preferences_api(request).await {
+            Ok(_) => {
+                // After parsing the response, notify the GUI thread of the increment value.
+                let _ = tx.send(1);
+                ctx.request_repaint();
+            }
+            Err(_) => {
+                // After parsing the response, notify the GUI thread of the increment value.
+                let _ = tx.send(2);
+                ctx.request_repaint();
+            }
+        }
     });
 }
 
@@ -624,13 +542,18 @@ fn export_blobs(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
             old_token,
             new_token,
         };
-        pdsmigration_common::export_blobs_api(request)
-            .await
-            .unwrap();
-
-        // After parsing the response, notify the GUI thread of the increment value.
-        let _ = tx.send(1);
-        ctx.request_repaint();
+        match pdsmigration_common::export_blobs_api(request).await {
+            Ok(_) => {
+                // After parsing the response, notify the GUI thread of the increment value.
+                let _ = tx.send(1);
+                ctx.request_repaint();
+            }
+            Err(_) => {
+                // After parsing the response, notify the GUI thread of the increment value.
+                let _ = tx.send(2);
+                ctx.request_repaint();
+            }
+        }
     });
 }
 
@@ -645,13 +568,18 @@ fn upload_blobs(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
             did,
             token,
         };
-        pdsmigration_common::upload_blobs_api(request)
-            .await
-            .unwrap();
-
-        // After parsing the response, notify the GUI thread of the increment value.
-        let _ = tx.send(1);
-        ctx.request_repaint();
+        match pdsmigration_common::upload_blobs_api(request).await {
+            Ok(_) => {
+                // After parsing the response, notify the GUI thread of the increment value.
+                let _ = tx.send(1);
+                ctx.request_repaint();
+            }
+            Err(_) => {
+                // After parsing the response, notify the GUI thread of the increment value.
+                let _ = tx.send(2);
+                ctx.request_repaint();
+            }
+        }
     });
 }
 
@@ -666,11 +594,18 @@ fn export_repo(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
             did,
             token,
         };
-        pdsmigration_common::export_pds_api(request).await.unwrap();
-
-        // After parsing the response, notify the GUI thread of the increment value.
-        let _ = tx.send(1);
-        ctx.request_repaint();
+        match pdsmigration_common::export_pds_api(request).await {
+            Ok(_) => {
+                // After parsing the response, notify the GUI thread of the increment value.
+                let _ = tx.send(1);
+                ctx.request_repaint();
+            }
+            Err(_) => {
+                // After parsing the response, notify the GUI thread of the increment value.
+                let _ = tx.send(2);
+                ctx.request_repaint();
+            }
+        }
     });
 }
 
@@ -685,11 +620,18 @@ fn import_repo(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
             did,
             token,
         };
-        pdsmigration_common::import_pds_api(request).await.unwrap();
-
-        // After parsing the response, notify the GUI thread of the increment value.
-        let _ = tx.send(1);
-        ctx.request_repaint();
+        match pdsmigration_common::import_pds_api(request).await {
+            Ok(_) => {
+                // After parsing the response, notify the GUI thread of the increment value.
+                let _ = tx.send(1);
+                ctx.request_repaint();
+            }
+            Err(_) => {
+                // After parsing the response, notify the GUI thread of the increment value.
+                let _ = tx.send(2);
+                ctx.request_repaint();
+            }
+        }
     });
 }
 
@@ -699,6 +641,8 @@ fn create_account(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
     let email = app.new_email.clone();
     let pds_host = app.old_pds_host.clone();
     let new_pds_host = app.new_pds_host.clone();
+    let aud = new_pds_host.replace("https://", "did:web:");
+
     let password = app.new_password.clone();
     let invite_code = app.invite_code.clone();
     let handle = app.new_handle.clone();
@@ -706,13 +650,17 @@ fn create_account(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
     tokio::spawn(async move {
         let service_auth_request = ServiceAuthRequest {
             pds_host: pds_host.clone(),
-            aud: "did:web:pds.ripperoni.com".to_string(),
+            aud,
             did: did.clone(),
             token: token.clone(),
         };
-        let token = pdsmigration_common::get_service_auth_api(service_auth_request)
-            .await
-            .unwrap();
+        let token = match pdsmigration_common::get_service_auth_api(service_auth_request).await {
+            Ok(res) => res,
+            Err(_) => {
+                let _ = tx.send(2);
+                panic!("");
+            }
+        };
 
         let create_account_request = CreateAccountApiRequest {
             email,
@@ -723,13 +671,16 @@ fn create_account(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
             pds_host: new_pds_host,
             did,
         };
-        pdsmigration_common::create_account_api(create_account_request)
-            .await
-            .unwrap();
-
-        // After parsing the response, notify the GUI thread of the increment value.
-        let _ = tx.send(1);
-        ctx.request_repaint();
+        match pdsmigration_common::create_account_api(create_account_request).await {
+            Ok(_) => {
+                let _ = tx.send(1);
+                ctx.request_repaint();
+            }
+            Err(_) => {
+                let _ = tx.send(2);
+                ctx.request_repaint();
+            }
+        }
     });
 }
 
@@ -744,19 +695,24 @@ fn old_session_login(
     let password = app.password.to_string();
     tokio::spawn(async move {
         let bsky_agent = BskyAgent::builder().build().await.unwrap();
-        let session = login_helper(
+        match login_helper(
             &bsky_agent,
             old_pds_host.as_str(),
             username.as_str(),
             password.as_str(),
         )
         .await
-        .unwrap();
-
-        login_tx.send(session).unwrap();
-
+        {
+            Ok(res) => {
+                let _ = tx.send(10);
+                login_tx.send(res).unwrap();
+            }
+            Err(_) => {
+                let _ = tx.send(2);
+                panic!("");
+            }
+        };
         // After parsing the response, notify the GUI thread of the increment value.
-        let _ = tx.send(1);
         ctx.request_repaint();
     });
 }
@@ -772,19 +728,25 @@ fn new_session_login(
     let new_password = app.new_password.to_string();
     tokio::spawn(async move {
         let bsky_agent = BskyAgent::builder().build().await.unwrap();
-        let session = login_helper(
+        match login_helper(
             &bsky_agent,
             new_pds_host.as_str(),
             new_handle.as_str(),
             new_password.as_str(),
         )
         .await
-        .unwrap();
-
-        login_tx.send(session).unwrap();
+        {
+            Ok(res) => {
+                let _ = tx.send(10);
+                login_tx.send(res).unwrap();
+            }
+            Err(_) => {
+                let _ = tx.send(2);
+                panic!("");
+            }
+        };
 
         // After parsing the response, notify the GUI thread of the increment value.
-        let _ = tx.send(1);
         ctx.request_repaint();
     });
 }
