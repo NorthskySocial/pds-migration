@@ -301,7 +301,7 @@ impl eframe::App for PdsMigrationApp {
                         }
                     } else {
                         ui.horizontal(|ui| {
-                            if ui.button("Old Login").clicked() {
+                            if ui.button(" Login to current PDS").clicked() {
                                 self.page = Page::OldLogin(Login {
                                     pds_host: "https://bsky.social".to_string(),
                                     username: "".to_string(),
