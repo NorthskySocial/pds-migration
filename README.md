@@ -6,7 +6,7 @@
 ## Overview
 Backend Application that accepts HTTP calls allowing for a user to migrate from one PDS to another
 
-HoppscotchCollection.json contains the necessary calls to make in order to perform migration
+~~HoppscotchCollection.json contains the necessary calls to make in order to perform migration~~ (Outdated)
 
 ## Steps to Migrate (All HTTP calls are POST)
 1. /service-auth
