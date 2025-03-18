@@ -113,7 +113,7 @@ pub async fn get_blob(agent: &BskyAgent, cid: Cid, did: Did) -> Result<Vec<u8>, 
         .sync
         .get_blob(Parameters {
             data: ParametersData {
-                cid: cid,
+                cid,
                 did: did.parse().unwrap(),
             },
             extra_data: Ipld::Null,
@@ -191,9 +191,7 @@ pub async fn import_preferences(
         .bsky
         .actor
         .put_preferences(Input {
-            data: InputData {
-                preferences: preferences,
-            },
+            data: InputData { preferences },
             extra_data: Ipld::Null,
         })
         .await;
@@ -310,7 +308,7 @@ pub async fn account_import(agent: &BskyAgent, filepath: &str) -> Result<(), Cus
         .com
         .atproto
         .repo
-        .import_repo(std::fs::read(filepath).unwrap())
+        .import_repo(tokio::fs::read(filepath).await.unwrap())
         .await;
     match result {
         Ok(_) => {
@@ -345,7 +343,9 @@ pub async fn account_export(agent: &BskyAgent, did: &Did) -> Result<(), CustomEr
         .await;
     match result {
         Ok(output) => {
-            std::fs::write(did.as_str().to_string() + ".car", output).unwrap();
+            tokio::fs::write(did.as_str().to_string() + ".car", output)
+                .await
+                .unwrap();
             tracing::info!("write success");
             Ok(())
         }

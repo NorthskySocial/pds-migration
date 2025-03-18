@@ -10,7 +10,6 @@ use bsky_sdk::BskyAgent;
 use ipld_core::cid::Cid;
 use serde::{Deserialize, Serialize};
 use std::io::ErrorKind;
-use std::{env, io};
 
 pub mod agent;
 pub mod error_code;
@@ -184,7 +183,7 @@ pub async fn export_blobs_api(req: ExportBlobsRequest) -> Result<(), CustomError
     )
     .await?;
     for missing_blob in &missing_blobs {
-        match std::fs::create_dir(session.did.as_str()) {
+        match tokio::fs::create_dir(session.did.as_str()).await {
             Ok(_) => {}
             Err(e) => {
                 if e.kind() != ErrorKind::AlreadyExists {
@@ -199,12 +198,13 @@ pub async fn export_blobs_api(req: ExportBlobsRequest) -> Result<(), CustomError
         match get_blob(&agent, missing_blob.cid.clone(), session.did.clone()).await {
             Ok(output) => {
                 tracing::info!("Successfully fetched missing blob");
-                std::fs::write(
+                tokio::fs::write(
                     String::from(session.did.as_str())
                         + "/"
                         + missing_blob.record_uri.as_str().split("/").last().unwrap(),
                     output,
                 )
+                .await
                 .unwrap();
             }
             Err(_) => {
@@ -238,8 +238,8 @@ pub async fn upload_blobs_api(req: UploadBlobsRequest) -> Result<(), CustomError
     )
     .await?;
 
-    let blob_dir;
-    match std::fs::read_dir(session.did.as_str()) {
+    let mut blob_dir;
+    match tokio::fs::read_dir(session.did.as_str()).await {
         Ok(output) => blob_dir = output,
         Err(_) => {
             return Err(CustomError {
@@ -248,8 +248,8 @@ pub async fn upload_blobs_api(req: UploadBlobsRequest) -> Result<(), CustomError
             })
         }
     }
-    for blob in blob_dir {
-        let file = std::fs::read(blob.unwrap().path()).unwrap();
+    while let Some(blob) = blob_dir.next_entry().await.unwrap() {
+        let file = tokio::fs::read(blob.path()).await.unwrap();
         upload_blob(&agent, file).await?;
     }
 
