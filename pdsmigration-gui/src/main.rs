@@ -9,35 +9,19 @@ use bsky_sdk::BskyAgent;
 use eframe::egui;
 use egui::Window;
 use pdsmigration_common::{
-    ActivateAccountRequest, CreateAccountApiRequest, DeactivateAccountRequest, ExportBlobsRequest,
-    ExportPDSRequest, ImportPDSRequest, MigratePlcRequest, MigratePreferencesRequest,
-    RequestTokenRequest, ServiceAuthRequest, UploadBlobsRequest,
+    CreateAccountApiRequest, ExportBlobsRequest, ExportPDSRequest, ImportPDSRequest,
+    MigratePlcRequest, MigratePreferencesRequest, RequestTokenRequest, ServiceAuthRequest,
+    UploadBlobsRequest,
 };
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 use tokio::runtime::Runtime;
 
-const CHAR_LIMIT: i32 = 300;
-const DIRECTORY_NAME: &str = "blobs";
-
 enum Page {
     Home,
-    OldLogin(Login),
-    NewLogin(Login),
+    OldLogin,
+    NewLogin,
     CreateAccount,
-}
-
-struct Login {
-    pds_host: String,
-    username: String,
-    password: String,
-}
-
-struct ServiceAuth {
-    old_pds_host: String,
-    username: String,
-    password: String,
-    new_pds_host: String,
 }
 
 fn main() -> eframe::Result {
@@ -65,7 +49,7 @@ fn main() -> eframe::Result {
     eframe::run_native(
         " PDS Migration Tool",
         options,
-        Box::new(|cc| Ok(Box::<PdsMigrationApp>::default())),
+        Box::new(|_cc| Ok(Box::<PdsMigrationApp>::default())),
     )
 }
 
@@ -96,10 +80,6 @@ struct PdsMigrationApp {
     tx: Sender<u32>,
     rx: Receiver<u32>,
 
-    // Sender/Receiver for async notifications.
-    page_tx: Sender<Page>,
-    page_rx: Receiver<Page>,
-
     // Sender/Receiver for login attempts to old pds
     login_tx: Sender<AtpSession>,
     login_rx: Receiver<AtpSession>,
@@ -107,16 +87,6 @@ struct PdsMigrationApp {
     // Sender/Receiver for login attempts to old pds
     new_login_tx: Sender<AtpSession>,
     new_login_rx: Receiver<AtpSession>,
-
-    // Silly app state.
-    value: u32,
-    count: u32,
-}
-
-impl PdsMigrationApp {
-    fn clear(&mut self) {
-        self.page = Page::Home;
-    }
 }
 
 impl Default for PdsMigrationApp {
@@ -124,7 +94,6 @@ impl Default for PdsMigrationApp {
         let (tx, rx) = std::sync::mpsc::channel();
         let (login_tx, login_rx) = std::sync::mpsc::channel();
         let (new_login_tx, new_login_rx) = std::sync::mpsc::channel();
-        let (page_tx, page_rx) = std::sync::mpsc::channel();
         Self {
             did: None,
             old_pds_token: None,
@@ -148,10 +117,6 @@ impl Default for PdsMigrationApp {
             login_rx,
             new_login_tx,
             new_login_rx,
-            page_tx,
-            page_rx,
-            value: 1,
-            count: 0,
         }
     }
 }
@@ -211,11 +176,7 @@ impl eframe::App for PdsMigrationApp {
                         if self.new_pds_token.is_none() {
                             ui.horizontal(|ui| {
                                 if ui.button("Login to New PDS").clicked() {
-                                    self.page = Page::NewLogin(Login {
-                                        pds_host: "https://pds.ripperoni.com".to_string(),
-                                        username: "".to_string(),
-                                        password: "".to_string(),
-                                    });
+                                    self.page = Page::NewLogin;
                                 }
                             });
                             ui.horizontal(|ui| {
@@ -302,16 +263,12 @@ impl eframe::App for PdsMigrationApp {
                     } else {
                         ui.horizontal(|ui| {
                             if ui.button(" Login to current PDS").clicked() {
-                                self.page = Page::OldLogin(Login {
-                                    pds_host: "https://bsky.social".to_string(),
-                                    username: "".to_string(),
-                                    password: "".to_string(),
-                                });
+                                self.page = Page::OldLogin;
                             }
                         });
                     }
                 }
-                Page::OldLogin(ref mut login) => {
+                Page::OldLogin => {
                     ui.heading("Old PDS Login");
                     ui.horizontal(|ui| {
                         ui.label("Old PDS: ");
@@ -334,7 +291,7 @@ impl eframe::App for PdsMigrationApp {
                         );
                     }
                 }
-                Page::NewLogin(ref mut login) => {
+                Page::NewLogin => {
                     ui.heading("New PDS Login");
                     ui.horizontal(|ui| {
                         ui.label("New PDS: ");
@@ -443,57 +400,6 @@ fn request_token(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
         }
 
         ctx.request_repaint();
-    });
-}
-
-fn activate_account(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
-    let did = app.did.clone().unwrap();
-    let pds_host = app.new_pds_host.to_string();
-    let token = app.new_pds_token.clone().unwrap();
-
-    tokio::spawn(async move {
-        let request = ActivateAccountRequest {
-            pds_host,
-            did,
-            token,
-        };
-        match pdsmigration_common::activate_account_api(request).await {
-            Ok(_) => {
-                // After parsing the response, notify the GUI thread of the increment value.
-                let _ = tx.send(1);
-                ctx.request_repaint();
-            }
-            Err(_) => {
-                // After parsing the response, notify the GUI thread of the increment value.
-                let _ = tx.send(2);
-                ctx.request_repaint();
-            }
-        }
-    });
-}
-fn deactivate_account(app: &PdsMigrationApp, tx: Sender<u32>, ctx: egui::Context) {
-    let did = app.did.clone().unwrap();
-    let pds_host = app.old_pds_host.to_string();
-    let token = app.old_pds_token.clone().unwrap();
-
-    tokio::spawn(async move {
-        let request = DeactivateAccountRequest {
-            pds_host,
-            did,
-            token,
-        };
-        match pdsmigration_common::deactivate_account_api(request).await {
-            Ok(_) => {
-                // After parsing the response, notify the GUI thread of the increment value.
-                let _ = tx.send(1);
-                ctx.request_repaint();
-            }
-            Err(_) => {
-                // After parsing the response, notify the GUI thread of the increment value.
-                let _ = tx.send(2);
-                ctx.request_repaint();
-            }
-        }
     });
 }
 

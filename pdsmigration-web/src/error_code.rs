@@ -8,15 +8,6 @@ pub struct CustomError {
     pub err_type: CustomErrorType,
 }
 
-impl CustomError {
-    pub fn message(&self) -> String {
-        match &self.message {
-            Some(c) => c.clone(),
-            None => String::from(""),
-        }
-    }
-}
-
 impl From<pdsmigration_common::error_code::CustomError> for CustomError {
     fn from(value: pdsmigration_common::error_code::CustomError) -> Self {
         Self {

@@ -5,21 +5,12 @@ use actix_web::dev::Server;
 use actix_web::web::Json;
 use actix_web::{middleware, post, App, HttpResponse, HttpServer};
 use dotenvy::dotenv;
-use ipld_core::cid::Cid;
-use pdsmigration_common::agent::{
-    account_export, account_import, activate_account, create_account, deactivate_account,
-    export_preferences, get_blob, get_service_auth, import_preferences, login_helper,
-    missing_blobs, recommended_plc, request_token, sign_plc, submit_plc, upload_blob,
-};
 use pdsmigration_common::error_code::CustomErrorType;
 use pdsmigration_common::{
-    ActivateAccountRequest, CreateAccountApiRequest, CreateAccountRequest,
-    DeactivateAccountRequest, ExportBlobsRequest, ExportPDSRequest, ImportPDSRequest,
-    MigratePlcRequest, MigratePreferencesRequest, MissingBlobsRequest, RequestTokenRequest,
-    ServiceAuthRequest, ServiceAuthResponse, UploadBlobsRequest,
+    ActivateAccountRequest, CreateAccountApiRequest, DeactivateAccountRequest, ExportBlobsRequest,
+    ExportPDSRequest, ImportPDSRequest, MigratePlcRequest, MigratePreferencesRequest,
+    MissingBlobsRequest, RequestTokenRequest, ServiceAuthRequest, UploadBlobsRequest,
 };
-use serde::{Deserialize, Serialize};
-use std::io::ErrorKind;
 use std::{env, io};
 
 pub const APPLICATION_JSON: &str = "application/json";
