@@ -1,0 +1,56 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      RUSTFLAGS: "-D warnings"
+    strategy:
+      fail-fast: false
+      matrix:
+        channel:
+          - "rust-toolchain"
+    name: Build and Test ${{ matrix.channel }}
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v4
+      - name: "Show environment"
+        run: |
+          rustc -vV
+          cargo -vV
+      - name: "Enable Rust Caching"
+        uses: Swatinem/rust-cache@v2
+      - name: "Run Tests"
+        id: tests
+        run: cargo test
+      - name: "Run Clippy"
+        id: clippy
+        run: cargo clippy -- -D warnings
+      - name: "Run Formatter"
+        id: formatting
+        run: cargo fmt -- --check
+      - name: "Some checks failed"
+        if: ${{ failure() }}
+        run: |
+         echo "### :x: Checks Failed!" >> $GITHUB_STEP_SUMMARY
+         echo "" >> $GITHUB_STEP_SUMMARY
+         echo "|Job|Status|" >> $GITHUB_STEP_SUMMARY
+         echo "|---|------|" >> $GITHUB_STEP_SUMMARY
+         echo "|test |${{ steps.tests.outcome }}|" >> $GITHUB_STEP_SUMMARY
+         echo "|clippy |${{ steps.clippy.outcome }}|" >> $GITHUB_STEP_SUMMARY
+         echo "|fmt|${{ steps.formatting.outcome }}|" >> $GITHUB_STEP_SUMMARY
+         echo "" >> $GITHUB_STEP_SUMMARY
+         echo "Please check the failed jobs and fix where needed." >> $GITHUB_STEP_SUMMARY
+         echo "" >> $GITHUB_STEP_SUMMARY
+         exit 1
+      - name: "All checks passed"
+        if: ${{ success() }}
+        run: |
+          echo "### :tada: Checks Passed!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
