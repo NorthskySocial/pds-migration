@@ -1,8 +1,5 @@
 use egui::{CornerRadius, RichText};
 
-/// Title of the application frame.
-pub const FRAME_TITLE: &str = "PDS Migration Tool";
-
 /// Margin to be applied to the main frame of the application.
 const FRAME_MARGIN: f32 = 50.0;
 
@@ -14,9 +11,6 @@ const FRAME_BG_COLOR: egui::Color32 = egui::Color32::from_rgb(250, 250, 250);
 
 /// Text color for the UI.
 const FRAME_TEXT_COLOR: egui::Color32 = egui::Color32::from_rgb(31, 11, 53);
-
-/// Size of the title text.
-const TITLE_SIZE: f32 = 36.0;
 
 /// Size of the subtitle text.
 const SUBTITLE_SIZE: f32 = 24.0;
@@ -61,11 +55,6 @@ pub fn setup_fonts(ctx: &egui::Context) {
 /// Sets the UI text color.
 pub fn set_text_color(ui: &mut egui::Ui) {
     ui.visuals_mut().override_text_color = Some(FRAME_TEXT_COLOR);
-}
-
-/// Renders a title-styled label with a specific text.
-pub fn render_title(ui: &mut egui::Ui, text: &str) {
-    render_heading(ui, text, TITLE_SIZE);
 }
 
 /// Renders a subtitle-styled label with a specific text.

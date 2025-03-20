@@ -1,20 +1,17 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod agent;
-mod create_account_page;
 mod errors;
 mod existing_pds_page;
 mod home_page;
 mod new_pds_page;
 mod styles;
 
-use crate::create_account_page::CreateAccountPage;
 use crate::errors::GuiError;
 use crate::existing_pds_page::ExistingPdsPage;
 use crate::home_page::HomePage;
 use crate::new_pds_page::NewPdsPage;
 use eframe::egui;
-use egui::Window;
-use std::fmt::format;
+use egui::{InnerResponse, Window};
 use std::sync::mpsc::Receiver;
 use std::time::Duration;
 use tokio::runtime::Runtime;
@@ -23,7 +20,6 @@ enum Page {
     Home(HomePage),
     OldLogin(ExistingPdsPage),
     NewLogin(NewPdsPage),
-    CreateAccount(CreateAccountPage),
 }
 
 fn main() -> eframe::Result {
@@ -49,9 +45,12 @@ fn main() -> eframe::Result {
     };
 
     eframe::run_native(
-        " PDS Migration Tool",
+        "PDS Migration Tool",
         options,
-        Box::new(|_cc| Ok(Box::<PdsMigrationApp>::default())),
+        Box::new(|cc| {
+            styles::setup_fonts(&cc.egui_ctx);
+            Ok(Box::<PdsMigrationApp>::default())
+        }),
     )
 }
 
@@ -81,16 +80,20 @@ impl eframe::App for PdsMigrationApp {
         self.check_page_update();
         self.check_for_errors(ctx);
 
+        let mut new_error_windows = vec![];
         for error_window in &mut self.error_windows {
-            error_window.show(ctx);
+            if error_window.open {
+                error_window.show(ctx);
+                new_error_windows.push(error_window.clone());
+            }
         }
+        self.error_windows = new_error_windows;
 
         let styled_frame = styles::get_styled_frame();
         egui::CentralPanel::default()
             .frame(styled_frame)
             .show(ctx, |ui| {
                 styles::set_text_color(ui);
-                styles::render_title(ui, styles::FRAME_TITLE);
 
                 match &mut self.page {
                     Page::Home(home_page) => {
@@ -101,9 +104,6 @@ impl eframe::App for PdsMigrationApp {
                     }
                     Page::NewLogin(new_pds_page) => {
                         new_pds_page.show(ui);
-                    }
-                    Page::CreateAccount(create_account_page) => {
-                        create_account_page.show(ui);
                     }
                 }
             });
@@ -118,7 +118,7 @@ impl PdsMigrationApp {
         }
     }
 
-    pub fn check_for_errors(&mut self, ctx: &egui::Context) {
+    pub fn check_for_errors(&mut self, _ctx: &egui::Context) {
         if let Ok(error) = self.error_rx.try_recv() {
             let error_window = ErrorWindow::new(error);
             self.error_windows.push(error_window);
@@ -126,6 +126,7 @@ impl PdsMigrationApp {
     }
 }
 
+#[derive(Clone)]
 pub struct ErrorWindow {
     open: bool,
     gui_error: GuiError,
@@ -139,8 +140,9 @@ impl ErrorWindow {
         }
     }
 
-    pub fn show(&mut self, ctx: &egui::Context) {
+    pub fn show(&mut self, ctx: &egui::Context) -> Option<InnerResponse<Option<()>>> {
         Window::new(self.gui_error.to_string())
+            .title_bar(false)
             .open(&mut self.open.clone())
             .vscroll(false)
             .resizable(false)
@@ -150,6 +152,6 @@ impl ErrorWindow {
                 if btn.clicked() {
                     self.open = false;
                 }
-            });
+            })
     }
 }

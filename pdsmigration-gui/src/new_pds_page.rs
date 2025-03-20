@@ -4,16 +4,23 @@ use crate::home_page::HomePage;
 use crate::{styles, Page};
 use bsky_sdk::BskyAgent;
 use egui::Ui;
-use std::sync::mpsc::Sender;
+use pdsmigration_common::{CreateAccountApiRequest, ServiceAuthRequest};
+use std::sync::mpsc::{Receiver, Sender};
 
 pub struct NewPdsPage {
     new_pds_host: String,
     new_handle: String,
     new_password: String,
+    new_email: String,
     error_tx: Sender<GuiError>,
     page_tx: Sender<Page>,
     old_pds_token: String,
     old_pds_host: String,
+    invite_code: String,
+    did: String,
+    login_tx: Sender<u32>,
+    login_rx: Receiver<u32>,
+    is_new_account: Option<bool>,
 }
 
 impl NewPdsPage {
@@ -22,7 +29,9 @@ impl NewPdsPage {
         error_tx: Sender<GuiError>,
         old_pds_token: String,
         old_pds_host: String,
+        did: String,
     ) -> Self {
+        let (login_tx, login_rx) = std::sync::mpsc::channel();
         Self {
             new_pds_host: "".to_string(),
             new_handle: "".to_string(),
@@ -31,18 +40,59 @@ impl NewPdsPage {
             new_password: "".to_string(),
             old_pds_token,
             old_pds_host,
+            invite_code: "".to_string(),
+            new_email: "".to_string(),
+            did,
+            login_tx,
+            login_rx,
+            is_new_account: None,
         }
     }
 
     pub fn show(&mut self, ui: &mut Ui) {
-        ui.vertical_centered(|ui| {
-            styles::render_input(ui, "New PDS URL", &mut self.new_pds_host, false);
-            styles::render_input(ui, "Username", &mut self.new_handle, false);
-            styles::render_input(ui, "Password", &mut self.new_password, true);
-            styles::render_button(ui, "Submit", || {
-                self.new_session_login();
-            });
-        });
+        match self.is_new_account {
+            None => {
+                styles::render_subtitle(ui, "Does your account exist on new PDS?");
+                ui.vertical_centered(|ui| {
+                    styles::render_button(ui, "Yes", || self.is_new_account = Some(false));
+                    styles::render_button(ui, "No", || self.is_new_account = Some(true));
+                });
+            }
+            Some(is_new_account) => {
+                if is_new_account {
+                    styles::render_subtitle(ui, "Create New PDS Account!");
+                    ui.vertical_centered(|ui| {
+                        styles::render_input(ui, "New PDS Host", &mut self.new_pds_host, false);
+                        styles::render_input(ui, "Email", &mut self.new_email, false);
+                        styles::render_input(ui, "Handle", &mut self.new_handle, false);
+                        styles::render_input(ui, "Password", &mut self.new_password, true);
+                        styles::render_input(
+                            ui,
+                            "Invite Code (Leave Blank if None)",
+                            &mut self.invite_code,
+                            false,
+                        );
+                        styles::render_button(ui, "Submit", || {
+                            self.create_account();
+                        });
+                    });
+                } else {
+                    styles::render_subtitle(ui, "New PDS Login!");
+                    ui.vertical_centered(|ui| {
+                        styles::render_input(ui, "New PDS Hosst", &mut self.new_pds_host, false);
+                        styles::render_input(ui, "Handle", &mut self.new_handle, false);
+                        styles::render_input(ui, "Password", &mut self.new_password, true);
+                        styles::render_button(ui, "Submit", || {
+                            self.new_session_login();
+                        });
+                    });
+                }
+            }
+        }
+
+        if self.login_rx.try_recv().is_ok() {
+            self.new_session_login();
+        }
     }
 
     fn new_session_login(&mut self) {
@@ -53,6 +103,7 @@ impl NewPdsPage {
         let error_tx = self.error_tx.clone();
         let old_pds_token = self.old_pds_token.clone();
         let old_pds_host = self.old_pds_host.clone();
+
         tokio::spawn(async move {
             let bsky_agent = BskyAgent::builder().build().await.unwrap();
             match login_helper(
@@ -82,6 +133,57 @@ impl NewPdsPage {
                     error_tx.send(e).unwrap();
                 }
             };
+        });
+    }
+
+    fn create_account(&mut self) {
+        let did = self.did.clone();
+        let token = self.old_pds_token.clone();
+        let email = self.new_email.clone();
+        let pds_host = self.old_pds_host.clone();
+        let new_pds_host = self.new_pds_host.clone();
+        let aud = new_pds_host.replace("https://", "did:web:");
+
+        let password = self.new_password.clone();
+        let invite_code = self.invite_code.clone();
+        let handle = self.new_handle.clone();
+
+        let error_tx = self.error_tx.clone();
+        let login_tx = self.login_tx.clone();
+
+        tokio::spawn(async move {
+            let service_auth_request = ServiceAuthRequest {
+                pds_host: pds_host.clone(),
+                aud,
+                did: did.clone(),
+                token: token.clone(),
+            };
+            let token = match pdsmigration_common::get_service_auth_api(service_auth_request).await
+            {
+                Ok(res) => res,
+                Err(_pds_error) => {
+                    error_tx.send(GuiError::Runtime).unwrap();
+                    return;
+                }
+            };
+
+            let create_account_request = CreateAccountApiRequest {
+                email,
+                handle,
+                invite_code,
+                password,
+                token,
+                pds_host: new_pds_host,
+                did,
+            };
+            match pdsmigration_common::create_account_api(create_account_request).await {
+                Ok(_) => {
+                    login_tx.send(1).unwrap();
+                }
+                Err(_pds_error) => {
+                    error_tx.send(GuiError::Runtime).unwrap();
+                }
+            }
         });
     }
 }

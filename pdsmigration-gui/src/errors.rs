@@ -1,6 +1,6 @@
 use derive_more::{Display, Error};
 
-#[derive(Debug, Display, Error)]
+#[derive(Debug, Display, Error, Clone)]
 pub enum GuiError {
     #[display("No Missing Blobs")]
     NoMissingBlobs,
@@ -10,4 +10,6 @@ pub enum GuiError {
     InvalidLogin,
     #[display("Runtime Exception")]
     Runtime,
+    #[display("Success")]
+    Success,
 }

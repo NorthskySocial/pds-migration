@@ -2,8 +2,9 @@ use crate::errors::GuiError;
 use crate::{styles, Page};
 use egui::Ui;
 use pdsmigration_common::{
-    ExportBlobsRequest, ExportPDSRequest, ImportPDSRequest, MigratePlcRequest,
-    MigratePreferencesRequest, RequestTokenRequest, UploadBlobsRequest,
+    ActivateAccountRequest, DeactivateAccountRequest, ExportBlobsRequest, ExportPDSRequest,
+    ImportPDSRequest, MigratePlcRequest, MigratePreferencesRequest, RequestTokenRequest,
+    UploadBlobsRequest,
 };
 use std::sync::mpsc::Sender;
 
@@ -16,12 +17,11 @@ pub struct HomePage {
     plc_token: String,
     user_recovery_key: String,
     error_tx: Sender<GuiError>,
-    page_tx: Sender<Page>,
 }
 
 impl HomePage {
     pub fn new(
-        page_tx: Sender<Page>,
+        _page_tx: Sender<Page>,
         error_tx: Sender<GuiError>,
         old_pds_token: String,
         new_pds_token: String,
@@ -36,7 +36,6 @@ impl HomePage {
             new_pds_host,
             old_pds_host,
             plc_token: "".to_string(),
-            page_tx,
             error_tx,
             user_recovery_key: "".to_string(),
         }
@@ -57,7 +56,7 @@ impl HomePage {
                 self.upload_blobs();
             });
             styles::render_button(ui, "Migrate Preferences", || {
-                self.upload_blobs();
+                self.migrate_preferences();
             });
             styles::render_button(ui, "Request Token", || {
                 self.request_token();
@@ -105,7 +104,7 @@ impl HomePage {
                     // After parsing the response, notify the GUI thread of the increment value.
                     // let _ = tx.send(1);
                 }
-                Err(pds_error) => {
+                Err(_pds_error) => {
                     error_tx.send(GuiError::NoMissingBlobs).unwrap();
                 }
             }
@@ -116,6 +115,7 @@ impl HomePage {
         let did = self.did.clone();
         let pds_host = self.new_pds_host.to_string();
         let token = self.new_pds_token.clone();
+        let error_tx = self.error_tx.clone();
 
         tokio::spawn(async move {
             let request = ImportPDSRequest {
@@ -129,8 +129,7 @@ impl HomePage {
                     // let _ = tx.send(1);
                 }
                 Err(_) => {
-                    // After parsing the response, notify the GUI thread of the increment value.
-                    // let _ = tx.send(2);
+                    error_tx.send(GuiError::Runtime).unwrap();
                 }
             }
         });
@@ -142,6 +141,7 @@ impl HomePage {
         let new_pds_host = self.new_pds_host.clone();
         let old_token = self.old_pds_token.clone();
         let new_token = self.new_pds_token.clone();
+        let error_tx = self.error_tx.clone();
 
         tokio::spawn(async move {
             let request = ExportBlobsRequest {
@@ -156,8 +156,8 @@ impl HomePage {
                     // After parsing the response, notify the GUI thread of the increment value.
                     // let _ = tx.send(1);
                 }
-                Err(pds_error) => {
-                    // let _ = tx.send(2);
+                Err(_pds_error) => {
+                    error_tx.send(GuiError::Runtime).unwrap();
                 }
             }
         });
@@ -167,6 +167,7 @@ impl HomePage {
         let did = self.did.clone();
         let pds_host = self.new_pds_host.clone();
         let token = self.new_pds_token.clone();
+        let error_tx = self.error_tx.clone();
 
         tokio::spawn(async move {
             let request = UploadBlobsRequest {
@@ -179,9 +180,8 @@ impl HomePage {
                     // After parsing the response, notify the GUI thread of the increment value.
                     // let _ = tx.send(1);
                 }
-                Err(_) => {
-                    // After parsing the response, notify the GUI thread of the increment value.
-                    // let _ = tx.send(2);
+                Err(_pds_error) => {
+                    error_tx.send(GuiError::Runtime).unwrap();
                 }
             }
         });
@@ -198,6 +198,7 @@ impl HomePage {
             true => None,
             false => Some(self.user_recovery_key.clone()),
         };
+        let error_tx = self.error_tx.clone();
 
         tokio::spawn(async move {
             let request = MigratePlcRequest {
@@ -213,8 +214,8 @@ impl HomePage {
                 Ok(_) => {
                     // let _ = tx.send(1);
                 }
-                Err(_) => {
-                    // let _ = tx.send(2);
+                Err(_pds_error) => {
+                    error_tx.send(GuiError::Runtime).unwrap();
                 }
             }
         });
@@ -226,6 +227,7 @@ impl HomePage {
         let new_pds_host = self.new_pds_host.clone();
         let old_token = self.old_pds_token.clone();
         let new_token = self.new_pds_token.clone();
+        let error_tx = self.error_tx.clone();
 
         tokio::spawn(async move {
             let request = MigratePreferencesRequest {
@@ -240,9 +242,8 @@ impl HomePage {
                     // After parsing the response, notify the GUI thread of the increment value.
                     // let _ = tx.send(1);
                 }
-                Err(_) => {
-                    // After parsing the response, notify the GUI thread of the increment value.
-                    // let _ = tx.send(2);
+                Err(_pds_error) => {
+                    error_tx.send(GuiError::Runtime).unwrap();
                 }
             }
         });
@@ -252,6 +253,7 @@ impl HomePage {
         let did = self.did.clone();
         let pds_host = self.old_pds_host.clone();
         let token = self.old_pds_token.clone();
+        let error_tx = self.error_tx.clone();
 
         tokio::spawn(async move {
             let request = RequestTokenRequest {
@@ -263,18 +265,56 @@ impl HomePage {
                 Ok(_) => {
                     // let _ = tx.send(1);
                 }
-                Err(_) => {
-                    // let _ = tx.send(2);
+                Err(_pds_error) => {
+                    error_tx.send(GuiError::Runtime).unwrap();
                 }
             }
         });
     }
 
     fn activate_account(&self) {
-        todo!()
+        let did = self.did.clone();
+        let pds_host = self.new_pds_host.clone();
+        let token = self.new_pds_token.clone();
+        let error_tx = self.error_tx.clone();
+
+        tokio::spawn(async move {
+            let request = ActivateAccountRequest {
+                pds_host,
+                did,
+                token,
+            };
+            match pdsmigration_common::activate_account_api(request).await {
+                Ok(_) => {
+                    // let _ = tx.send(1);
+                }
+                Err(_pds_error) => {
+                    error_tx.send(GuiError::Runtime).unwrap();
+                }
+            }
+        });
     }
 
     fn deactivate_account(&self) {
-        todo!()
+        let did = self.did.clone();
+        let pds_host = self.new_pds_host.clone();
+        let token = self.new_pds_token.clone();
+        let error_tx = self.error_tx.clone();
+
+        tokio::spawn(async move {
+            let request = DeactivateAccountRequest {
+                pds_host,
+                did,
+                token,
+            };
+            match pdsmigration_common::deactivate_account_api(request).await {
+                Ok(_) => {
+                    // let _ = tx.send(1);
+                }
+                Err(_pds_error) => {
+                    error_tx.send(GuiError::Runtime).unwrap();
+                }
+            }
+        });
     }
 }

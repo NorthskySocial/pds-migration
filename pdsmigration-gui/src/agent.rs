@@ -3,7 +3,6 @@ use atrium_xrpc::error::XrpcErrorKind;
 use bsky_sdk::api::agent::atp_agent::AtpSession;
 use bsky_sdk::api::agent::Configure;
 use bsky_sdk::BskyAgent;
-use std::fmt::Debug;
 
 pub async fn login_helper(
     agent: &BskyAgent,

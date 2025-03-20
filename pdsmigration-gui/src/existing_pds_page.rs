@@ -29,8 +29,8 @@ impl ExistingPdsPage {
         styles::render_subtitle(ui, "Old PDS Login!");
 
         ui.vertical_centered(|ui| {
-            styles::render_input(ui, "Old PDS URL", &mut self.old_pds_host, false);
-            styles::render_input(ui, "Username", &mut self.username, false);
+            styles::render_input(ui, "Old PDS Host", &mut self.old_pds_host, false);
+            styles::render_input(ui, "Handle", &mut self.username, false);
             styles::render_input(ui, "Password", &mut self.password, true);
             styles::render_button(ui, "Submit", || {
                 self.old_session_login();
@@ -56,12 +56,14 @@ impl ExistingPdsPage {
             {
                 Ok(res) => {
                     let old_pds_token = res.access_jwt.clone();
+                    let did = res.did.as_str().to_string();
                     page_tx
                         .send(Page::NewLogin(NewPdsPage::new(
                             page_tx.clone(),
                             error_tx,
                             old_pds_token,
                             old_pds_host,
+                            did,
                         )))
                         .unwrap();
                 }
