@@ -1,4 +1,4 @@
-use crate::error_code::{CustomError, CustomErrorType};
+use crate::errors::PdsError;
 use crate::CreateAccountRequest;
 use bsky_sdk::api::agent::atp_agent::AtpSession;
 use bsky_sdk::api::agent::Configure;
@@ -20,7 +20,7 @@ pub async fn login_helper(
     pds_host: &str,
     did: &str,
     token: &str,
-) -> Result<AtpSession, CustomError> {
+) -> Result<AtpSession, PdsError> {
     use bsky_sdk::api::com::atproto::server::create_session::OutputData;
     agent.configure_endpoint(pds_host.to_string());
     match agent
@@ -47,10 +47,7 @@ pub async fn login_helper(
         }
         Err(e) => {
             tracing::error!("Error logging in: {:?}", e);
-            Err(CustomError {
-                message: Some("Failed to login".to_string()),
-                err_type: CustomErrorType::LoginError,
-            })
+            Err(PdsError::Login)
         }
     }
 }
@@ -73,7 +70,7 @@ pub async fn describe_server(
 }
 
 #[tracing::instrument(skip(agent))]
-pub async fn missing_blobs(agent: &BskyAgent) -> Result<Vec<RecordBlob>, CustomError> {
+pub async fn missing_blobs(agent: &BskyAgent) -> Result<Vec<RecordBlob>, PdsError> {
     use bsky_sdk::api::com::atproto::repo::list_missing_blobs::{Parameters, ParametersData};
     let result = agent
         .api
@@ -95,10 +92,7 @@ pub async fn missing_blobs(agent: &BskyAgent) -> Result<Vec<RecordBlob>, CustomE
         }
         Err(e) => {
             tracing::error!("{:?}", e);
-            Err(CustomError {
-                message: None,
-                err_type: CustomErrorType::ValidationError,
-            })
+            Err(PdsError::Validation)
         }
     }
 }
@@ -125,14 +119,14 @@ pub async fn get_blob(agent: &BskyAgent, cid: Cid, did: Did) -> Result<Vec<u8>, 
             Ok(output.clone())
         }
         Err(e) => {
-            tracing::error!("Failed to upload blob: {:?}", e);
+            tracing::error!("Failed to fetch blob: {:?}", e);
             Err(())
         }
     }
 }
 
 #[tracing::instrument(skip(agent, input))]
-pub async fn upload_blob(agent: &BskyAgent, input: Vec<u8>) -> Result<(), CustomError> {
+pub async fn upload_blob(agent: &BskyAgent, input: Vec<u8>) -> Result<(), PdsError> {
     let result = agent.api.com.atproto.repo.upload_blob(input).await;
     match result {
         Ok(output) => {
@@ -142,16 +136,13 @@ pub async fn upload_blob(agent: &BskyAgent, input: Vec<u8>) -> Result<(), Custom
         }
         Err(e) => {
             tracing::error!("Failed to upload blob: {:?}", e);
-            Err(CustomError {
-                message: None,
-                err_type: CustomErrorType::ValidationError,
-            })
+            Err(PdsError::Validation)
         }
     }
 }
 
 #[tracing::instrument(skip(agent))]
-pub async fn export_preferences(agent: &BskyAgent) -> Result<Preferences, CustomError> {
+pub async fn export_preferences(agent: &BskyAgent) -> Result<Preferences, PdsError> {
     use bsky_sdk::api::app::bsky::actor::get_preferences::{Parameters, ParametersData};
     let result = agent
         .api
@@ -171,10 +162,7 @@ pub async fn export_preferences(agent: &BskyAgent) -> Result<Preferences, Custom
         }
         Err(e) => {
             tracing::error!("Failed to export preferences: {:?}", e);
-            Err(CustomError {
-                message: None,
-                err_type: CustomErrorType::ValidationError,
-            })
+            Err(PdsError::Validation)
         }
     }
 }
@@ -183,7 +171,7 @@ pub async fn export_preferences(agent: &BskyAgent) -> Result<Preferences, Custom
 pub async fn import_preferences(
     agent: &BskyAgent,
     preferences: Preferences,
-) -> Result<(), CustomError> {
+) -> Result<(), PdsError> {
     use bsky_sdk::api::app::bsky::actor::put_preferences::{Input, InputData};
     let result = agent
         .api
@@ -203,16 +191,13 @@ pub async fn import_preferences(
         }
         Err(e) => {
             tracing::error!("Failed to import preferences: {:?}", e);
-            Err(CustomError {
-                message: None,
-                err_type: CustomErrorType::ValidationError,
-            })
+            Err(PdsError::Validation)
         }
     }
 }
 
 #[tracing::instrument(skip(agent))]
-pub async fn recommended_plc(agent: &BskyAgent) -> Result<RecommendedDidOutputData, CustomError> {
+pub async fn recommended_plc(agent: &BskyAgent) -> Result<RecommendedDidOutputData, PdsError> {
     let result = agent
         .api
         .com
@@ -228,16 +213,13 @@ pub async fn recommended_plc(agent: &BskyAgent) -> Result<RecommendedDidOutputDa
         }
         Err(e) => {
             tracing::error!("Failed to import preferences: {:?}", e);
-            Err(CustomError {
-                message: None,
-                err_type: CustomErrorType::ValidationError,
-            })
+            Err(PdsError::Validation)
         }
     }
 }
 
 #[tracing::instrument(skip(agent))]
-pub async fn get_service_auth(agent: &BskyAgent, aud: &str) -> Result<String, CustomError> {
+pub async fn get_service_auth(agent: &BskyAgent, aud: &str) -> Result<String, PdsError> {
     use bsky_sdk::api::com::atproto::server::get_service_auth::{Parameters, ParametersData};
     let result = agent
         .api
@@ -261,19 +243,13 @@ pub async fn get_service_auth(agent: &BskyAgent, aud: &str) -> Result<String, Cu
         }
         Err(e) => {
             tracing::error!("Failed to request service auth: {:?}", e);
-            Err(CustomError {
-                message: Some("Failed to request service auth".to_string()),
-                err_type: CustomErrorType::RuntimeError,
-            })
+            Err(PdsError::Runtime)
         }
     }
 }
 
 #[tracing::instrument(skip(agent))]
-pub async fn sign_plc(
-    agent: &BskyAgent,
-    plc_input_data: InputData,
-) -> Result<Unknown, CustomError> {
+pub async fn sign_plc(agent: &BskyAgent, plc_input_data: InputData) -> Result<Unknown, PdsError> {
     use bsky_sdk::api::com::atproto::identity::sign_plc_operation::Input;
     let result = agent
         .api
@@ -293,16 +269,13 @@ pub async fn sign_plc(
         }
         Err(e) => {
             tracing::error!("Failed to sign token: {:?}", e);
-            Err(CustomError {
-                message: None,
-                err_type: CustomErrorType::ValidationError,
-            })
+            Err(PdsError::Validation)
         }
     }
 }
 
 #[tracing::instrument(skip(agent))]
-pub async fn account_import(agent: &BskyAgent, filepath: &str) -> Result<(), CustomError> {
+pub async fn account_import(agent: &BskyAgent, filepath: &str) -> Result<(), PdsError> {
     let result = agent
         .api
         .com
@@ -317,16 +290,13 @@ pub async fn account_import(agent: &BskyAgent, filepath: &str) -> Result<(), Cus
         }
         Err(e) => {
             eprintln!("Error importing: {:?}", e);
-            Err(CustomError {
-                message: None,
-                err_type: CustomErrorType::AccountImportError,
-            })
+            Err(PdsError::AccountImport)
         }
     }
 }
 
 #[tracing::instrument(skip(agent))]
-pub async fn account_export(agent: &BskyAgent, did: &Did) -> Result<(), CustomError> {
+pub async fn account_export(agent: &BskyAgent, did: &Did) -> Result<(), PdsError> {
     use bsky_sdk::api::com::atproto::sync::get_repo::{Parameters, ParametersData};
     let result = agent
         .api
@@ -351,16 +321,13 @@ pub async fn account_export(agent: &BskyAgent, did: &Did) -> Result<(), CustomEr
         }
         Err(e) => {
             tracing::error!("Error exporting: {:?}", e);
-            Err(CustomError {
-                message: None,
-                err_type: CustomErrorType::AccountExportError,
-            })
+            Err(PdsError::AccountExport)
         }
     }
 }
 
 #[tracing::instrument(skip(agent))]
-pub async fn deactivate_account(agent: &BskyAgent) -> Result<(), CustomError> {
+pub async fn deactivate_account(agent: &BskyAgent) -> Result<(), PdsError> {
     use bsky_sdk::api::com::atproto::server::deactivate_account::{Input, InputData};
     let result = agent
         .api
@@ -380,16 +347,13 @@ pub async fn deactivate_account(agent: &BskyAgent) -> Result<(), CustomError> {
         }
         Err(e) => {
             tracing::error!("Failed to deactivate account: {:?}", e);
-            Err(CustomError {
-                message: None,
-                err_type: CustomErrorType::ValidationError,
-            })
+            Err(PdsError::Validation)
         }
     }
 }
 
 #[tracing::instrument(skip(agent))]
-pub async fn activate_account(agent: &BskyAgent) -> Result<(), CustomError> {
+pub async fn activate_account(agent: &BskyAgent) -> Result<(), PdsError> {
     let result = agent.api.com.atproto.server.activate_account().await;
     match result {
         Ok(output) => {
@@ -399,16 +363,13 @@ pub async fn activate_account(agent: &BskyAgent) -> Result<(), CustomError> {
         }
         Err(e) => {
             tracing::error!("Failed to activate account: {:?}", e);
-            Err(CustomError {
-                message: None,
-                err_type: CustomErrorType::ValidationError,
-            })
+            Err(PdsError::Validation)
         }
     }
 }
 
 #[tracing::instrument(skip(agent))]
-pub async fn submit_plc(agent: &BskyAgent, signed_plc: Unknown) -> Result<(), CustomError> {
+pub async fn submit_plc(agent: &BskyAgent, signed_plc: Unknown) -> Result<(), PdsError> {
     use bsky_sdk::api::com::atproto::identity::submit_plc_operation::{Input, InputData};
     let result = agent
         .api
@@ -430,16 +391,13 @@ pub async fn submit_plc(agent: &BskyAgent, signed_plc: Unknown) -> Result<(), Cu
         }
         Err(e) => {
             tracing::error!("Failed to submitted PLC Operation: {:?}", e);
-            Err(CustomError {
-                message: None,
-                err_type: CustomErrorType::ValidationError,
-            })
+            Err(PdsError::Validation)
         }
     }
 }
 
 #[tracing::instrument(skip(agent))]
-async fn account_status(agent: &BskyAgent) -> Result<(), CustomError> {
+async fn account_status(agent: &BskyAgent) -> Result<(), PdsError> {
     match agent.api.com.atproto.server.check_account_status().await {
         Ok(output) => {
             tracing::info!("Successfully Got Account Status");
@@ -448,16 +406,13 @@ async fn account_status(agent: &BskyAgent) -> Result<(), CustomError> {
         }
         Err(e) => {
             tracing::error!("{:?}", e);
-            Err(CustomError {
-                message: Some("Error getting account status".to_string()),
-                err_type: CustomErrorType::AccountStatusError,
-            })
+            Err(PdsError::AccountStatus)
         }
     }
 }
 
 #[tracing::instrument(skip(agent))]
-pub async fn request_token(agent: &BskyAgent) -> Result<(), CustomError> {
+pub async fn request_token(agent: &BskyAgent) -> Result<(), PdsError> {
     let result = agent
         .api
         .com
@@ -469,10 +424,7 @@ pub async fn request_token(agent: &BskyAgent) -> Result<(), CustomError> {
         Ok(_) => Ok(()),
         Err(e) => {
             tracing::error!("{:?}", e);
-            Err(CustomError {
-                message: None,
-                err_type: CustomErrorType::ValidationError,
-            })
+            Err(PdsError::Validation)
         }
     }
 }
@@ -481,7 +433,7 @@ pub async fn request_token(agent: &BskyAgent) -> Result<(), CustomError> {
 pub async fn create_account(
     pds_host: &str,
     account_request: &CreateAccountRequest,
-) -> Result<(), CustomError> {
+) -> Result<(), PdsError> {
     use bsky_sdk::api::com::atproto::server::create_account::{Input, InputData};
     let client = reqwest::Client::new();
     let x = serde_json::to_string(&Input {
@@ -514,18 +466,12 @@ pub async fn create_account(
             _ => {
                 tracing::error!("Error creating account: {:?}", output);
                 tracing::error!("More: {:?}", output.text().await);
-                return Err(CustomError {
-                    message: None,
-                    err_type: CustomErrorType::ValidationError,
-                });
+                return Err(PdsError::Validation);
             }
         },
         Err(e) => {
             tracing::error!("Error creating account: {:?}", e);
-            return Err(CustomError {
-                message: None,
-                err_type: CustomErrorType::ValidationError,
-            });
+            return Err(PdsError::Validation);
         }
     }
     Ok(())

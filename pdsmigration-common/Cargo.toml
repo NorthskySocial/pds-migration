@@ -13,3 +13,4 @@ reqwest = "0.12.12"
 aws-config = { version = "1.5.14", features = ["behavior-version-latest"]}
 aws-sdk-s3 = "1.70.0"
 tokio = "1.43.0"
+derive_more = { version = "2.0.1" ,features = ["display",  "error"]}

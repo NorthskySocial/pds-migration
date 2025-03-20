@@ -14,3 +14,5 @@ eframe = { version = "0.31.0", features = [
     "default",
     "__screenshot", # __screenshot is so we can dump a screenshot using EFRAME_SCREENSHOT_TO
 ] }
+derive_more = "2.0.1"
+atrium-xrpc = "0.12.1"

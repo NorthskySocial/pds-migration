@@ -1,11 +1,10 @@
-mod error_code;
+mod errors;
 
-use crate::error_code::CustomError;
+use crate::errors::ApiError;
 use actix_web::dev::Server;
 use actix_web::web::Json;
 use actix_web::{middleware, post, App, HttpResponse, HttpServer};
 use dotenvy::dotenv;
-use pdsmigration_common::error_code::CustomErrorType;
 use pdsmigration_common::{
     ActivateAccountRequest, CreateAccountApiRequest, DeactivateAccountRequest, ExportBlobsRequest,
     ExportPDSRequest, ImportPDSRequest, MigratePlcRequest, MigratePreferencesRequest,
@@ -57,9 +56,7 @@ async fn main() -> io::Result<()> {
 }
 
 #[post("/service-auth")]
-pub async fn get_service_auth_api(
-    req: Json<ServiceAuthRequest>,
-) -> Result<HttpResponse, CustomError> {
+pub async fn get_service_auth_api(req: Json<ServiceAuthRequest>) -> Result<HttpResponse, ApiError> {
     let response = pdsmigration_common::get_service_auth_api(req.into_inner()).await?;
     Ok(HttpResponse::Ok().json(response))
 }
@@ -68,21 +65,21 @@ pub async fn get_service_auth_api(
 #[post("/create-account")]
 pub async fn create_account_api(
     req: Json<CreateAccountApiRequest>,
-) -> Result<HttpResponse, CustomError> {
+) -> Result<HttpResponse, ApiError> {
     pdsmigration_common::create_account_api(req.into_inner()).await?;
     Ok(HttpResponse::Ok().finish())
 }
 
 #[tracing::instrument]
 #[post("/export-repo")]
-pub async fn export_pds_api(req: Json<ExportPDSRequest>) -> Result<HttpResponse, CustomError> {
+pub async fn export_pds_api(req: Json<ExportPDSRequest>) -> Result<HttpResponse, ApiError> {
     pdsmigration_common::export_pds_api(req.into_inner()).await?;
     Ok(HttpResponse::Ok().finish())
 }
 
 #[tracing::instrument]
 #[post("/import-repo")]
-pub async fn import_pds_api(req: Json<ImportPDSRequest>) -> Result<HttpResponse, CustomError> {
+pub async fn import_pds_api(req: Json<ImportPDSRequest>) -> Result<HttpResponse, ApiError> {
     let endpoint_url = env::var("ENDPOINT").unwrap();
     let config = aws_config::from_env()
         .region("auto")
@@ -109,10 +106,7 @@ pub async fn import_pds_api(req: Json<ImportPDSRequest>) -> Result<HttpResponse,
         }
         Err(e) => {
             tracing::error!("{:?}", e);
-            return Err(CustomError {
-                message: None,
-                err_type: CustomErrorType::ValidationError,
-            });
+            return Err(ApiError::Validation);
         }
     }
     pdsmigration_common::import_pds_api(req.into_inner()).await?;
@@ -121,9 +115,7 @@ pub async fn import_pds_api(req: Json<ImportPDSRequest>) -> Result<HttpResponse,
 
 #[tracing::instrument]
 #[post("/missing-blobs")]
-pub async fn missing_blobs_api(
-    req: Json<MissingBlobsRequest>,
-) -> Result<HttpResponse, CustomError> {
+pub async fn missing_blobs_api(req: Json<MissingBlobsRequest>) -> Result<HttpResponse, ApiError> {
     let response = pdsmigration_common::missing_blobs_api(req.into_inner()).await?;
     Ok(HttpResponse::Ok()
         .content_type(APPLICATION_JSON)
@@ -132,14 +124,14 @@ pub async fn missing_blobs_api(
 
 #[tracing::instrument]
 #[post("/export-blobs")]
-pub async fn export_blobs_api(req: Json<ExportBlobsRequest>) -> Result<HttpResponse, CustomError> {
+pub async fn export_blobs_api(req: Json<ExportBlobsRequest>) -> Result<HttpResponse, ApiError> {
     pdsmigration_common::export_blobs_api(req.into_inner()).await?;
     Ok(HttpResponse::Ok().content_type(APPLICATION_JSON).finish())
 }
 
 #[tracing::instrument]
 #[post("/upload-blobs")]
-pub async fn upload_blobs_api(req: Json<UploadBlobsRequest>) -> Result<HttpResponse, CustomError> {
+pub async fn upload_blobs_api(req: Json<UploadBlobsRequest>) -> Result<HttpResponse, ApiError> {
     pdsmigration_common::upload_blobs_api(req.into_inner()).await?;
     Ok(HttpResponse::Ok().content_type(APPLICATION_JSON).finish())
 }
@@ -148,7 +140,7 @@ pub async fn upload_blobs_api(req: Json<UploadBlobsRequest>) -> Result<HttpRespo
 #[post("/activate-account")]
 pub async fn activate_account_api(
     req: Json<ActivateAccountRequest>,
-) -> Result<HttpResponse, CustomError> {
+) -> Result<HttpResponse, ApiError> {
     pdsmigration_common::activate_account_api(req.into_inner()).await?;
     Ok(HttpResponse::Ok().content_type(APPLICATION_JSON).finish())
 }
@@ -157,7 +149,7 @@ pub async fn activate_account_api(
 #[post("/deactivate-account")]
 pub async fn deactivate_account_api(
     req: Json<DeactivateAccountRequest>,
-) -> Result<HttpResponse, CustomError> {
+) -> Result<HttpResponse, ApiError> {
     pdsmigration_common::deactivate_account_api(req.into_inner()).await?;
     Ok(HttpResponse::Ok().content_type(APPLICATION_JSON).finish())
 }
@@ -166,23 +158,21 @@ pub async fn deactivate_account_api(
 #[post("/migrate-preferences")]
 pub async fn migrate_preferences_api(
     req: Json<MigratePreferencesRequest>,
-) -> Result<HttpResponse, CustomError> {
+) -> Result<HttpResponse, ApiError> {
     pdsmigration_common::migrate_preferences_api(req.into_inner()).await?;
     Ok(HttpResponse::Ok().content_type(APPLICATION_JSON).finish())
 }
 
 #[tracing::instrument]
 #[post("/request-token")]
-pub async fn request_token_api(
-    req: Json<RequestTokenRequest>,
-) -> Result<HttpResponse, CustomError> {
+pub async fn request_token_api(req: Json<RequestTokenRequest>) -> Result<HttpResponse, ApiError> {
     pdsmigration_common::request_token_api(req.into_inner()).await?;
     Ok(HttpResponse::Ok().content_type(APPLICATION_JSON).finish())
 }
 
 #[tracing::instrument(skip(req))]
 #[post("/migrate-plc")]
-pub async fn migrate_plc_api(req: Json<MigratePlcRequest>) -> Result<HttpResponse, CustomError> {
+pub async fn migrate_plc_api(req: Json<MigratePlcRequest>) -> Result<HttpResponse, ApiError> {
     pdsmigration_common::migrate_plc_api(req.into_inner()).await?;
     Ok(HttpResponse::Ok().content_type(APPLICATION_JSON).finish())
 }

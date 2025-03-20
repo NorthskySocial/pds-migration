@@ -3,7 +3,7 @@ use crate::agent::{
     export_preferences, get_blob, get_service_auth, import_preferences, login_helper,
     missing_blobs, recommended_plc, request_token, sign_plc, submit_plc, upload_blob,
 };
-use crate::error_code::{CustomError, CustomErrorType};
+use crate::errors::PdsError;
 use bsky_sdk::api::agent::Configure;
 use bsky_sdk::api::types::string::Did;
 use bsky_sdk::BskyAgent;
@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::io::ErrorKind;
 
 pub mod agent;
-pub mod error_code;
+pub mod errors;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ServiceAuthRequest {
@@ -27,7 +27,7 @@ pub struct ServiceAuthResponse {
     pub token: String,
 }
 
-pub async fn get_service_auth_api(req: ServiceAuthRequest) -> Result<String, CustomError> {
+pub async fn get_service_auth_api(req: ServiceAuthRequest) -> Result<String, PdsError> {
     let agent = BskyAgent::builder().build().await.unwrap();
     login_helper(
         &agent,
@@ -66,7 +66,7 @@ pub struct CreateAccountRequest {
 }
 
 #[tracing::instrument(skip(req))]
-pub async fn create_account_api(req: CreateAccountApiRequest) -> Result<(), CustomError> {
+pub async fn create_account_api(req: CreateAccountApiRequest) -> Result<(), PdsError> {
     create_account(
         req.pds_host.as_str(),
         &CreateAccountRequest {
@@ -94,7 +94,7 @@ pub struct ExportPDSRequest {
 }
 
 #[tracing::instrument]
-pub async fn export_pds_api(req: ExportPDSRequest) -> Result<(), CustomError> {
+pub async fn export_pds_api(req: ExportPDSRequest) -> Result<(), PdsError> {
     let agent = BskyAgent::builder().build().await.unwrap();
     let session = login_helper(
         &agent,
@@ -115,7 +115,7 @@ pub struct ImportPDSRequest {
 }
 
 #[tracing::instrument]
-pub async fn import_pds_api(req: ImportPDSRequest) -> Result<(), CustomError> {
+pub async fn import_pds_api(req: ImportPDSRequest) -> Result<(), PdsError> {
     let agent = BskyAgent::builder().build().await.unwrap();
     let session = login_helper(
         &agent,
@@ -136,7 +136,7 @@ pub struct MissingBlobsRequest {
 }
 
 #[tracing::instrument]
-pub async fn missing_blobs_api(req: MissingBlobsRequest) -> Result<String, CustomError> {
+pub async fn missing_blobs_api(req: MissingBlobsRequest) -> Result<String, PdsError> {
     let agent = BskyAgent::builder().build().await.unwrap();
     login_helper(
         &agent,
@@ -165,8 +165,11 @@ pub struct ExportBlobsRequest {
 }
 
 #[tracing::instrument]
-pub async fn export_blobs_api(req: ExportBlobsRequest) -> Result<(), CustomError> {
-    let agent = BskyAgent::builder().build().await.unwrap();
+pub async fn export_blobs_api(req: ExportBlobsRequest) -> Result<(), PdsError> {
+    let agent = BskyAgent::builder().build().await.map_err(|error| {
+        tracing::error!("{}", error.to_string());
+        PdsError::Runtime
+    })?;
     login_helper(
         &agent,
         req.new_pds_host.as_str(),
@@ -188,10 +191,7 @@ pub async fn export_blobs_api(req: ExportBlobsRequest) -> Result<(), CustomError
             Err(e) => {
                 if e.kind() != ErrorKind::AlreadyExists {
                     tracing::error!("Error creating directory: {:?}", e);
-                    return Err(CustomError {
-                        message: None,
-                        err_type: CustomErrorType::ValidationError,
-                    });
+                    return Err(PdsError::Validation);
                 }
             }
         }
@@ -205,14 +205,14 @@ pub async fn export_blobs_api(req: ExportBlobsRequest) -> Result<(), CustomError
                     output,
                 )
                 .await
-                .unwrap();
+                .map_err(|error| {
+                    tracing::error!("{}", error.to_string());
+                    PdsError::Runtime
+                })?;
             }
             Err(_) => {
                 tracing::error!("Failed to determine missing blobs");
-                return Err(CustomError {
-                    message: None,
-                    err_type: CustomErrorType::ValidationError,
-                });
+                return Err(PdsError::Validation);
             }
         }
     }
@@ -227,7 +227,7 @@ pub struct UploadBlobsRequest {
 }
 
 #[tracing::instrument]
-pub async fn upload_blobs_api(req: UploadBlobsRequest) -> Result<(), CustomError> {
+pub async fn upload_blobs_api(req: UploadBlobsRequest) -> Result<(), PdsError> {
     let agent = BskyAgent::builder().build().await.unwrap();
     agent.configure_endpoint(req.pds_host.clone());
     let session = login_helper(
@@ -241,12 +241,7 @@ pub async fn upload_blobs_api(req: UploadBlobsRequest) -> Result<(), CustomError
     let mut blob_dir;
     match tokio::fs::read_dir(session.did.as_str()).await {
         Ok(output) => blob_dir = output,
-        Err(_) => {
-            return Err(CustomError {
-                message: None,
-                err_type: CustomErrorType::ValidationError,
-            })
-        }
+        Err(_) => return Err(PdsError::Validation),
     }
     while let Some(blob) = blob_dir.next_entry().await.unwrap() {
         let file = tokio::fs::read(blob.path()).await.unwrap();
@@ -264,7 +259,7 @@ pub struct ActivateAccountRequest {
 }
 
 #[tracing::instrument]
-pub async fn activate_account_api(req: ActivateAccountRequest) -> Result<(), CustomError> {
+pub async fn activate_account_api(req: ActivateAccountRequest) -> Result<(), PdsError> {
     let agent = BskyAgent::builder().build().await.unwrap();
     login_helper(
         &agent,
@@ -288,7 +283,7 @@ pub struct DeactivateAccountRequest {
 pub struct DeactivateAccountResponse {}
 
 #[tracing::instrument]
-pub async fn deactivate_account_api(req: DeactivateAccountRequest) -> Result<(), CustomError> {
+pub async fn deactivate_account_api(req: DeactivateAccountRequest) -> Result<(), PdsError> {
     let agent = BskyAgent::builder().build().await.unwrap();
     login_helper(
         &agent,
@@ -311,7 +306,7 @@ pub struct MigratePreferencesRequest {
 }
 
 #[tracing::instrument]
-pub async fn migrate_preferences_api(req: MigratePreferencesRequest) -> Result<(), CustomError> {
+pub async fn migrate_preferences_api(req: MigratePreferencesRequest) -> Result<(), PdsError> {
     let agent = BskyAgent::builder().build().await.unwrap();
     login_helper(
         &agent,
@@ -340,7 +335,7 @@ pub struct RequestTokenRequest {
 }
 
 #[tracing::instrument]
-pub async fn request_token_api(req: RequestTokenRequest) -> Result<(), CustomError> {
+pub async fn request_token_api(req: RequestTokenRequest) -> Result<(), PdsError> {
     let agent = BskyAgent::builder().build().await.unwrap();
     login_helper(
         &agent,
@@ -366,7 +361,7 @@ pub struct MigratePlcRequest {
 }
 
 #[tracing::instrument(skip(req))]
-pub async fn migrate_plc_api(req: MigratePlcRequest) -> Result<(), CustomError> {
+pub async fn migrate_plc_api(req: MigratePlcRequest) -> Result<(), PdsError> {
     let agent = BskyAgent::builder().build().await.unwrap();
     login_helper(
         &agent,
