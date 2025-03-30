@@ -19,7 +19,7 @@
       },
       "body": {
         "contentType": "application/json",
-        "body": "{\n  \"pds_host\": \"<<old_host>>\",\n  \"did\": <<did>>,\n  \"token\": <<session_token>>,\n  \"aud\": \"did:web:pds.northsky.social\"\n}"
+        "body": "{\n  \"pds_host\": <<origin>>,\n  \"did\": <<did>>,\n  \"token\": <<origin_token>>,\n  \"aud\": <<aud>>\n}"
       },
       "requestVariables": [],
       "responses": {}
@@ -39,7 +39,7 @@
       },
       "body": {
         "contentType": "application/json",
-        "body": "{\n  \"pds_host\": \"<<new_host>>\",\n  \"handle\": \"<<new_handle>>\",\n  \"password\": \"<<new_password>>\",\n  \"email\": <<new_email>>,\n  \"token\": <<service_token>>,\n  \"did\": <<did>>,\n  \"invite_code\": \"pds-ripperoni-com-ceuso-6bmgc\"\n}\n"
+        "body": "{\n  \"pds_host\": <<destination>>,\n  \"handle\": <<destination_handle>>,\n  \"password\": <<destination_password>>,\n  \"email\": <<destination_email>>,\n  \"token\": <<service_token>>,\n  \"did\": <<did>>,\n  \"invite_code\": <<invite_code>>,\n  \"recovery_key\": <<recovery_key>>\n}\n"
       },
       "requestVariables": [],
       "responses": {}
@@ -59,7 +59,7 @@
       },
       "body": {
         "contentType": "application/json",
-        "body": "{\n  \"pds_host\": \"<<old_host>>\",\n  \"did\": <<did>>,\n  \"token\": <<session_token>>,\n}"
+        "body": "{\n  \"pds_host\": \"<<origin>>\",\n  \"did\": <<did>>,\n  \"token\": <<origin_token>>,\n}"
       },
       "requestVariables": [],
       "responses": {}
@@ -79,7 +79,7 @@
       },
       "body": {
         "contentType": "application/json",
-        "body": "{\n  \"pds_host\": \"<<new_host>>\",\n  \"handle\": \"<<new_handle>>\",\n  \"password\": \"<<new_password>>\"\n}"
+        "body": "{\n  \"pds_host\": \"<<destination>>\",\n  \"did\": \"<<did>>\",\n  \"token\": \"<<destination_token>>\"\n}"
       },
       "requestVariables": [],
       "responses": {}
@@ -99,7 +99,7 @@
       },
       "body": {
         "contentType": "application/json",
-        "body": "{\n  \"new_pds_host\": \"<<new_host>>\",\n  \"new_handle\": \"<<new_handle>>\",\n  \"new_password\": \"<<new_password>>\",\n  \"old_pds_host\": \"<<old_host>>\",\n  \"did\": <<did>>,\n  \"token\": <<session_token>>,\n}"
+        "body": "{\n  \"destination\": \"<<destination>>\",\n  \"destination_token\": \"<<destination_token>>\",\n  \"origin\": \"<<origin>>\",\n  \"did\": <<did>>,\n  \"origin_token\": <<origin_token>>,\n}"
       },
       "requestVariables": [],
       "responses": {}
@@ -119,7 +119,7 @@
       },
       "body": {
         "contentType": "application/json",
-        "body": "{\n  \"pds_host\": \"<<new_host>>\",\n  \"handle\": \"<<new_handle>>\",\n  \"password\": \"<<new_password>>\"\n}"
+        "body": "{\n  \"pds_host\": \"<<destination_host>>\",\n  \"did\": \"<<did>>\",\n  \"token\": \"<<destination_token>>\"\n}"
       },
       "requestVariables": [],
       "responses": {}
@@ -139,14 +139,14 @@
       },
       "body": {
         "contentType": "application/json",
-        "body": "{\n  \"new_pds_host\": \"<<new_host>>\",\n  \"new_handle\": \"<<new_handle>>\",\n  \"new_password\": \"<<new_password>>\",\n  \"old_pds_host\": \"<<old_host>>\",\n  \"did\": <<did>>,\n  \"token\": <<session_token>>,\n}"
+        "body": "{\n  \"destination\": \"<<destination>>\",\n  \"destination_token\": \"<<destination_token>>\",\n  \"origin\": \"<<origin>>\",\n  \"origin_token\": \"<<origin_token>>\",\n  \"did\": <<did>>,\n}"
       },
       "requestVariables": [],
       "responses": {}
     },
     {
       "v": "11",
-      "name": "Request Token",
+      "name": "Request PLC Token",
       "method": "POST",
       "endpoint": "<<host>>/request-token",
       "params": [],
@@ -159,7 +159,7 @@
       },
       "body": {
         "contentType": "application/json",
-        "body": "{\n  \"pds_host\": \"<<old_host>>\",\n  \"handle\": \"<<old_handle>>\",\n  \"password\": \"<<old_password>>\"\n}"
+        "body": "{\n  \"pds_host\": \"<<origin_host>>\",\n  \"did\": \"<<did>>\",\n  \"token\": \"<<origin_token>>\"\n}"
       },
       "requestVariables": [],
       "responses": {}
@@ -179,7 +179,7 @@
       },
       "body": {
         "contentType": "application/json",
-        "body": "{\n  \"new_pds_host\": \"<<new_host>>\",\n  \"new_handle\": \"<<new_handle>>\",\n  \"new_password\": \"<<new_password>>\",\n  \"old_pds_host\": \"<<old_host>>\",\n  \"old_handle\": \"<<old_handle>>\",\n  \"old_password\": \"<<old_password>>\",\n  \"plc_signing_token\": \"FJUTX-TNJ34\"\n}"
+        "body": "{\n  \"destination\": \"<<destination>>\",\n  \"destination_token\": \"<<destination_token>>\",\n  \"origin\": \"<<origin>>\",\n  \"did\": \"<<did>>\",\n  \"origin_token\": \"<<origin_token>>\",\n  \"plc_signing_token\": \"<<plc_signing_token>>\",\n  \"user_recover_key\": \"<<user_recover_key>>\"\n}"
       },
       "requestVariables": [],
       "responses": {}
@@ -199,7 +199,7 @@
       },
       "body": {
         "contentType": "application/json",
-        "body": "{\n  \"pds_host\": \"<<new_host>>\",\n  \"handle\": \"<<new_handle>>\",\n  \"password\": \"<<new_password>>\"\n}"
+        "body": "{\n  \"pds_host\": \"<<destination>>\",\n  \"did\": \"<<did>>\",\n  \"token\": \"<<destination_token>>\"\n}"
       },
       "requestVariables": [],
       "responses": {}
@@ -219,7 +219,7 @@
       },
       "body": {
         "contentType": "application/json",
-        "body": "{\n  \"pds_host\": \"<<old_host>>\",\n  \"did\": <<did>>,\n  \"token\": <<session_token>>,\n}"
+        "body": "{\n  \"pds_host\": \"<<origin>>\",\n  \"did\": <<did>>,\n  \"token\": <<origin_token>>,\n}"
       },
       "requestVariables": [],
       "responses": {}
@@ -230,5 +230,5 @@
     "authActive": true
   },
   "headers": [],
-  "_ref_id": "coll_m7lkwlce_48abfa9d-fb60-4330-b994-7886e9068674"
+  "_ref_id": "coll_m8w45t7h_104dc3f3-fda0-4a7f-9c86-fb753397b9de"
 }

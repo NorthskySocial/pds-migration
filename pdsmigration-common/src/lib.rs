@@ -49,6 +49,8 @@ pub struct CreateAccountApiRequest {
     pub token: String,
     pub pds_host: String,
     pub did: String,
+    #[serde(skip_serializing_if = "core::option::Option::is_none")]
+    pub recovery_key: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -75,7 +77,7 @@ pub async fn create_account_api(req: CreateAccountApiRequest) -> Result<(), PdsE
             handle: req.handle.parse().unwrap(),
             invite_code: Some(req.invite_code.clone()),
             password: Some(req.password.clone()),
-            recovery_key: None,
+            recovery_key: req.recovery_key.clone(),
             verification_code: Some(String::from("")),
             verification_phone: None,
             plc_op: None,
@@ -157,11 +159,11 @@ pub async fn missing_blobs_api(req: MissingBlobsRequest) -> Result<String, PdsEr
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ExportBlobsRequest {
-    pub new_pds_host: String,
-    pub old_pds_host: String,
+    pub destination: String,
+    pub origin: String,
     pub did: String,
-    pub old_token: String,
-    pub new_token: String,
+    pub origin_token: String,
+    pub destination_token: String,
 }
 
 #[tracing::instrument]
@@ -172,17 +174,17 @@ pub async fn export_blobs_api(req: ExportBlobsRequest) -> Result<(), PdsError> {
     })?;
     login_helper(
         &agent,
-        req.new_pds_host.as_str(),
+        req.destination.as_str(),
         req.did.as_str(),
-        req.new_token.as_str(),
+        req.destination_token.as_str(),
     )
     .await?;
     let missing_blobs = missing_blobs(&agent).await?;
     let session = login_helper(
         &agent,
-        req.old_pds_host.as_str(),
+        req.origin.as_str(),
         req.did.as_str(),
-        req.old_token.as_str(),
+        req.origin_token.as_str(),
     )
     .await?;
     for missing_blob in &missing_blobs {
@@ -298,11 +300,11 @@ pub async fn deactivate_account_api(req: DeactivateAccountRequest) -> Result<(),
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MigratePreferencesRequest {
-    pub new_pds_host: String,
-    pub new_token: String,
-    pub old_pds_host: String,
+    pub destination: String,
+    pub destination_token: String,
+    pub origin: String,
     pub did: String,
-    pub old_token: String,
+    pub origin_token: String,
 }
 
 #[tracing::instrument]
@@ -310,17 +312,17 @@ pub async fn migrate_preferences_api(req: MigratePreferencesRequest) -> Result<(
     let agent = BskyAgent::builder().build().await.unwrap();
     login_helper(
         &agent,
-        req.old_pds_host.as_str(),
+        req.origin.as_str(),
         req.did.as_str(),
-        req.old_token.as_str(),
+        req.origin_token.as_str(),
     )
     .await?;
     let preferences = export_preferences(&agent).await?;
     login_helper(
         &agent,
-        req.new_pds_host.as_str(),
+        req.destination.as_str(),
         req.did.as_str(),
-        req.new_token.as_str(),
+        req.destination_token.as_str(),
     )
     .await?;
     import_preferences(&agent, preferences).await?;
@@ -350,11 +352,11 @@ pub async fn request_token_api(req: RequestTokenRequest) -> Result<(), PdsError>
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MigratePlcRequest {
-    pub new_pds_host: String,
-    pub new_token: String,
-    pub old_pds_host: String,
+    pub destination: String,
+    pub destination_token: String,
+    pub origin: String,
     pub did: String,
-    pub old_token: String,
+    pub origin_token: String,
     pub plc_signing_token: String,
     #[serde(skip_serializing_if = "core::option::Option::is_none")]
     pub user_recovery_key: Option<String>,
@@ -365,9 +367,9 @@ pub async fn migrate_plc_api(req: MigratePlcRequest) -> Result<(), PdsError> {
     let agent = BskyAgent::builder().build().await.unwrap();
     login_helper(
         &agent,
-        req.new_pds_host.as_str(),
+        req.destination.as_str(),
         req.did.as_str(),
-        req.new_token.as_str(),
+        req.destination_token.as_str(),
     )
     .await?;
     let recommended_did = recommended_plc(&agent).await?;
@@ -388,17 +390,17 @@ pub async fn migrate_plc_api(req: MigratePlcRequest) -> Result<(), PdsError> {
     };
     login_helper(
         &agent,
-        req.old_pds_host.as_str(),
+        req.origin.as_str(),
         req.did.as_str(),
-        req.old_token.as_str(),
+        req.origin_token.as_str(),
     )
     .await?;
     let output = sign_plc(&agent, new_plc.clone()).await?;
     login_helper(
         &agent,
-        req.new_pds_host.as_str(),
+        req.destination.as_str(),
         req.did.as_str(),
-        req.new_token.as_str(),
+        req.destination_token.as_str(),
     )
     .await?;
     submit_plc(&agent, output).await?;
