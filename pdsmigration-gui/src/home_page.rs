@@ -145,11 +145,11 @@ impl HomePage {
 
         tokio::spawn(async move {
             let request = ExportBlobsRequest {
-                new_pds_host,
-                old_pds_host,
+                destination: new_pds_host,
+                origin: old_pds_host,
                 did,
-                old_token,
-                new_token,
+                origin_token: old_token,
+                destination_token: new_token,
             };
             match pdsmigration_common::export_blobs_api(request).await {
                 Ok(_) => {
@@ -189,10 +189,10 @@ impl HomePage {
 
     fn migrate_plc(&mut self) {
         let did = self.did.clone();
-        let old_pds_host = self.old_pds_host.clone();
-        let new_pds_host = self.new_pds_host.clone();
-        let old_token = self.old_pds_token.clone();
-        let new_token = self.new_pds_token.clone();
+        let origin = self.old_pds_host.clone();
+        let destination = self.new_pds_host.clone();
+        let origin_token = self.old_pds_token.clone();
+        let destination_token = self.new_pds_token.clone();
         let plc_signing_token = self.plc_token.clone();
         let user_recovery_key = match self.user_recovery_key.is_empty() {
             true => None,
@@ -202,11 +202,11 @@ impl HomePage {
 
         tokio::spawn(async move {
             let request = MigratePlcRequest {
-                new_pds_host,
-                new_token,
-                old_pds_host,
+                destination,
+                destination_token,
+                origin,
                 did,
-                old_token,
+                origin_token,
                 plc_signing_token,
                 user_recovery_key,
             };
@@ -223,19 +223,19 @@ impl HomePage {
 
     fn migrate_preferences(&mut self) {
         let did = self.did.clone();
-        let old_pds_host = self.old_pds_host.clone();
-        let new_pds_host = self.new_pds_host.clone();
-        let old_token = self.old_pds_token.clone();
-        let new_token = self.new_pds_token.clone();
+        let origin = self.old_pds_host.clone();
+        let destination = self.new_pds_host.clone();
+        let origin_token = self.old_pds_token.clone();
+        let destination_token = self.new_pds_token.clone();
         let error_tx = self.error_tx.clone();
 
         tokio::spawn(async move {
             let request = MigratePreferencesRequest {
-                new_pds_host,
-                new_token,
-                old_pds_host,
+                destination,
+                destination_token,
+                origin,
                 did,
-                old_token,
+                origin_token,
             };
             match pdsmigration_common::migrate_preferences_api(request).await {
                 Ok(_) => {

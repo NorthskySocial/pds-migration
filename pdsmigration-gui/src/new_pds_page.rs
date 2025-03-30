@@ -175,6 +175,7 @@ impl NewPdsPage {
                 token,
                 pds_host: new_pds_host,
                 did,
+                recovery_key: None,
             };
             match pdsmigration_common::create_account_api(create_account_request).await {
                 Ok(_) => {
