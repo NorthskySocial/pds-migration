@@ -35,6 +35,14 @@ jobs:
       - name: "Run Formatter"
         id: formatting
         run: cargo fmt -- --check
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: "Run Docker Build"
+      - name: Docker Build
+        id: dockerbuild
+        uses: docker/build-push-action@v6
+        with:
+          push: false
       - name: "Some checks failed"
         if: ${{ failure() }}
         run: |
@@ -45,6 +53,7 @@ jobs:
          echo "|test |${{ steps.tests.outcome }}|" >> $GITHUB_STEP_SUMMARY
          echo "|clippy |${{ steps.clippy.outcome }}|" >> $GITHUB_STEP_SUMMARY
          echo "|fmt|${{ steps.formatting.outcome }}|" >> $GITHUB_STEP_SUMMARY
+          echo "|fmt|${{ steps.dockerbuild.outcome }}|" >> $GITHUB_STEP_SUMMARY
          echo "" >> $GITHUB_STEP_SUMMARY
          echo "Please check the failed jobs and fix where needed." >> $GITHUB_STEP_SUMMARY
          echo "" >> $GITHUB_STEP_SUMMARY
