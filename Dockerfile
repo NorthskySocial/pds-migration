@@ -3,7 +3,7 @@ FROM rust:latest AS builder
 # Copy local code to the container image.
 WORKDIR /app
 
-COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
+COPY Cargo.toml rust-toolchain.toml ./
 COPY pdsmigration-common pdsmigration-common
 COPY pdsmigration-gui pdsmigration-gui
 COPY pdsmigration-web pdsmigration-web

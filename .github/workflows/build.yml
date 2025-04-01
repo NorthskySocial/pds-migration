@@ -52,7 +52,7 @@ jobs:
          echo "|test |${{ steps.tests.outcome }}|" >> $GITHUB_STEP_SUMMARY
          echo "|clippy |${{ steps.clippy.outcome }}|" >> $GITHUB_STEP_SUMMARY
          echo "|fmt|${{ steps.formatting.outcome }}|" >> $GITHUB_STEP_SUMMARY
-          echo "|fmt|${{ steps.dockerbuild.outcome }}|" >> $GITHUB_STEP_SUMMARY
+          echo "|dockerbuild|${{ steps.dockerbuild.outcome }}|" >> $GITHUB_STEP_SUMMARY
          echo "" >> $GITHUB_STEP_SUMMARY
          echo "Please check the failed jobs and fix where needed." >> $GITHUB_STEP_SUMMARY
          echo "" >> $GITHUB_STEP_SUMMARY
