@@ -15,3 +15,7 @@ FROM rust:slim
 COPY --from=builder /app/target/release/pdsmigration-web/ .
 
 ENTRYPOINT ["./pdsmigration-web"]
+
+LABEL org.opencontainers.image.source=https://github.com/NorthskySocial/pds-migration
+LABEL org.opencontainers.image.description="PDS migration tool"
+LABEL org.opencontainers.image.licenses=MIT
