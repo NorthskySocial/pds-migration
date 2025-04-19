@@ -5,9 +5,18 @@ on:
     branches: [main]
   pull_request:
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
     timeout-minutes: 120
     env:
       RUSTFLAGS: "-D warnings"
@@ -20,6 +29,17 @@ jobs:
     steps:
       - name: "Checkout"
         uses: actions/checkout@v4
+      - name: Log in to the Container registry
+        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
       - name: "Show environment"
         run: |
           rustc -vV
@@ -37,28 +57,37 @@ jobs:
         run: cargo fmt -- --check
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - name: "Run Docker Build"
-        id: dockerbuild
-        uses: docker/build-push-action@v6
+      - name: Build and push Docker image
+        id: push
+        uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
         with:
-          push: false
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
       - name: "Some checks failed"
         if: ${{ failure() }}
         run: |
-         echo "### :x: Checks Failed!" >> $GITHUB_STEP_SUMMARY
-         echo "" >> $GITHUB_STEP_SUMMARY
-         echo "|Job|Status|" >> $GITHUB_STEP_SUMMARY
-         echo "|---|------|" >> $GITHUB_STEP_SUMMARY
-         echo "|test |${{ steps.tests.outcome }}|" >> $GITHUB_STEP_SUMMARY
-         echo "|clippy |${{ steps.clippy.outcome }}|" >> $GITHUB_STEP_SUMMARY
-         echo "|fmt|${{ steps.formatting.outcome }}|" >> $GITHUB_STEP_SUMMARY
-          echo "|dockerbuild|${{ steps.dockerbuild.outcome }}|" >> $GITHUB_STEP_SUMMARY
-         echo "" >> $GITHUB_STEP_SUMMARY
-         echo "Please check the failed jobs and fix where needed." >> $GITHUB_STEP_SUMMARY
-         echo "" >> $GITHUB_STEP_SUMMARY
-         exit 1
+          echo "### :x: Checks Failed!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "|Job|Status|" >> $GITHUB_STEP_SUMMARY
+          echo "|---|------|" >> $GITHUB_STEP_SUMMARY
+          echo "|test |${{ steps.tests.outcome }}|" >> $GITHUB_STEP_SUMMARY
+          echo "|clippy |${{ steps.clippy.outcome }}|" >> $GITHUB_STEP_SUMMARY
+          echo "|fmt|${{ steps.formatting.outcome }}|" >> $GITHUB_STEP_SUMMARY
+           echo "|dockerbuild|${{ steps.dockerbuild.outcome }}|" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Please check the failed jobs and fix where needed." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          exit 1
       - name: "All checks passed"
         if: ${{ success() }}
         run: |
           echo "### :tada: Checks Passed!" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
