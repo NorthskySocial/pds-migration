@@ -200,7 +200,7 @@ impl SuccessWindow {
             .vscroll(false)
             .resizable(false)
             .show(ctx, |ui| {
-                ui.label(format!("{}", self.message));
+                ui.label(self.message.to_string());
                 let btn = ui.button("Ok");
                 if btn.clicked() {
                     self.open = false;
