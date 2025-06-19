@@ -2,7 +2,10 @@
 on:
   release:
     types: [created]
-
+permissions:
+  contents: write
+  packages: write
+  issues: write
 jobs:
   release:
     name: release ${{ matrix.target }}
@@ -15,8 +18,6 @@ jobs:
             archive: zip
           - target: x86_64-unknown-linux-musl
             archive: tar.gz tar.xz tar.zst
-          - target: x86_64-apple-darwin
-            archive: zip
     steps:
       - uses: actions/checkout@master
       - name: Compile and release
