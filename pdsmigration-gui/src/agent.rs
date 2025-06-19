@@ -21,7 +21,7 @@ pub async fn login_helper(
                         return Err(GuiError::InvalidPdsEndpoint);
                     }
                     Some(e) => match e {
-                        XrpcErrorKind::Custom(e) => {
+                        XrpcErrorKind::Custom(_e) => {
                             return Err(GuiError::InvalidLogin);
                         }
                         XrpcErrorKind::Undefined(e) => {

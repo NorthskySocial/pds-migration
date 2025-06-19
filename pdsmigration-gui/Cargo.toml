@@ -20,3 +20,8 @@ eframe = { version = "0.31.0", features = [
 ] }
 derive_more = "2.0.1"
 atrium-xrpc = "0.12.1"
+zip = "4.1.0"
+secp256k1 = { version = "0.31.0", features = ["rand"] }
+multibase = "0.9.1"
+unsigned-varint = "0.8.0"
+rand = "0.9.1"

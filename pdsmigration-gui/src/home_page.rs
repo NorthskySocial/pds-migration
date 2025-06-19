@@ -1,12 +1,17 @@
 use crate::errors::GuiError;
 use crate::{styles, Page};
 use egui::Ui;
+use multibase::Base::Base58Btc;
 use pdsmigration_common::{
     ActivateAccountRequest, DeactivateAccountRequest, ExportBlobsRequest, ExportPDSRequest,
     ImportPDSRequest, MigratePlcRequest, MigratePreferencesRequest, RequestTokenRequest,
     UploadBlobsRequest,
 };
+use secp256k1::Secp256k1;
+use std::io::Write;
 use std::sync::mpsc::Sender;
+use zip::write::SimpleFileOptions;
+use zip::{AesMode, ZipWriter};
 
 pub struct HomePage {
     old_pds_token: String,
@@ -64,6 +69,9 @@ impl HomePage {
             styles::render_button(ui, "Request Token", || {
                 self.request_token();
             });
+            styles::render_button(ui, "Generate Recovery Key", || {
+                self.generate_recovery_key();
+            });
             ui.horizontal(|ui| {
                 ui.horizontal(|ui| {
                     ui.vertical(|ui| {
@@ -72,7 +80,7 @@ impl HomePage {
                     });
                     ui.vertical(|ui| {
                         ui.label("User Recovery Key (optional)");
-                        ui.text_edit_singleline(&mut self.plc_token);
+                        ui.text_edit_singleline(&mut self.user_recovery_key);
                     });
                     ui.vertical(|ui| {
                         if ui.button("Migrate PLC").clicked() {
@@ -290,6 +298,49 @@ impl HomePage {
                 }
             }
         });
+    }
+
+    fn multicodec_wrap(bytes: Vec<u8>) -> Vec<u8> {
+        let mut buf = [0u8; 3];
+        unsigned_varint::encode::u16(0xe7, &mut buf);
+        let mut v: Vec<u8> = Vec::new();
+        for b in &buf {
+            v.push(*b);
+            // varint uses first bit to indicate another byte follows, stop if not the case
+            if *b <= 127 {
+                break;
+            }
+        }
+        v.extend(bytes);
+        v
+    }
+
+    fn generate_recovery_key(&mut self) {
+        let secp = Secp256k1::new();
+        let (secret_key, public_key) = secp.generate_keypair(&mut rand::rng());
+        let pk_compact = public_key.serialize();
+        let pk_wrapped = Self::multicodec_wrap(pk_compact.to_vec());
+        let pk_multibase = multibase::encode(Base58Btc, pk_wrapped.as_slice());
+        let public_key_str = format!("did:key:{pk_multibase}");
+        self.user_recovery_key = public_key_str;
+
+        let sk_compact = secret_key.secret_bytes().to_vec();
+        let sk_wrapped = Self::multicodec_wrap(sk_compact.to_vec());
+        let sk_multibase = multibase::encode(Base58Btc, sk_wrapped.as_slice());
+        let secret_key_str = format!("did:key:{sk_multibase}");
+
+        let path = std::path::Path::new("RotationKey.zip");
+        let file = std::fs::File::create(path).unwrap();
+
+        let mut zip = ZipWriter::new(file);
+
+        let options = SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored)
+            .with_aes_encryption(AesMode::Aes256, "password");
+        zip.start_file("RotationKey", options).unwrap();
+        zip.write_all(&secret_key_str.as_bytes()[..]).unwrap();
+
+        zip.finish().unwrap();
     }
 
     fn activate_account(&self) {

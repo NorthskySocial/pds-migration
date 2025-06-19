@@ -116,32 +116,6 @@ pub fn render_button(ui: &mut egui::Ui, label: &str, callback: impl FnOnce()) {
     ui.add_space(WIDGET_SPACING_BASE);
 }
 
-/// Renders a styled button that runs a callback function when clicked.
-pub fn render_theme_buttons(ui: &mut egui::Ui, callback: impl FnOnce()) {
-    ui.add_space(WIDGET_SPACING_BASE);
-
-    ui.vertical_centered(|ui| {
-        ui.spacing_mut().button_padding =
-            egui::vec2(4.0 * WIDGET_SPACING_BASE, 2.0 * WIDGET_SPACING_BASE);
-
-        let text_label = egui::RichText::new("Light").color(FRAME_TEXT_COLOR);
-        let button = egui::Button::new(text_label)
-            .fill(BUTTON_BG_COLOR)
-            .corner_radius(CornerRadius::same(0));
-
-        if ui.add(button).clicked() {
-            callback();
-        }
-
-        let text_label = egui::RichText::new("Light").color(FRAME_TEXT_COLOR);
-        let button = egui::Button::new(text_label)
-            .fill(BUTTON_BG_COLOR)
-            .corner_radius(CornerRadius::same(0));
-    });
-
-    ui.add_space(WIDGET_SPACING_BASE);
-}
-
 /// Renders a heading-styled label with a specific text and size.
 fn render_heading(ui: &mut egui::Ui, text: &str, size: f32) {
     egui::Frame::default()
