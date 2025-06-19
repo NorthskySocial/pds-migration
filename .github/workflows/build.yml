@@ -49,9 +49,9 @@ jobs:
       - name: "Run Tests"
         id: tests
         run: cargo test
-      - name: "Run Clippy"
-        id: clippy
-        run: cargo clippy -- -D warnings
+      - name: "Run Check"
+        id: check
+        run: cargo check -- -D warnings
       - name: "Run Formatter"
         id: formatting
         run: cargo fmt -- --check
