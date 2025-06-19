@@ -97,7 +97,10 @@ pub struct ExportPDSRequest {
 
 #[tracing::instrument]
 pub async fn export_pds_api(req: ExportPDSRequest) -> Result<(), PdsError> {
-    let agent = BskyAgent::builder().build().await.unwrap();
+    let agent = BskyAgent::builder().build().await.map_err(|error| {
+        tracing::error!("{}", error.to_string());
+        PdsError::Runtime
+    })?;
     let session = login_helper(
         &agent,
         req.pds_host.as_str(),
@@ -118,7 +121,10 @@ pub struct ImportPDSRequest {
 
 #[tracing::instrument]
 pub async fn import_pds_api(req: ImportPDSRequest) -> Result<(), PdsError> {
-    let agent = BskyAgent::builder().build().await.unwrap();
+    let agent = BskyAgent::builder().build().await.map_err(|error| {
+        tracing::error!("{}", error.to_string());
+        PdsError::Runtime
+    })?;
     let session = login_helper(
         &agent,
         req.pds_host.as_str(),
@@ -230,7 +236,10 @@ pub struct UploadBlobsRequest {
 
 #[tracing::instrument]
 pub async fn upload_blobs_api(req: UploadBlobsRequest) -> Result<(), PdsError> {
-    let agent = BskyAgent::builder().build().await.unwrap();
+    let agent = BskyAgent::builder().build().await.map_err(|error| {
+        tracing::error!("{}", error.to_string());
+        PdsError::Runtime
+    })?;
     agent.configure_endpoint(req.pds_host.clone());
     let session = login_helper(
         &agent,
@@ -262,7 +271,10 @@ pub struct ActivateAccountRequest {
 
 #[tracing::instrument]
 pub async fn activate_account_api(req: ActivateAccountRequest) -> Result<(), PdsError> {
-    let agent = BskyAgent::builder().build().await.unwrap();
+    let agent = BskyAgent::builder().build().await.map_err(|error| {
+        tracing::error!("{}", error.to_string());
+        PdsError::Runtime
+    })?;
     login_helper(
         &agent,
         req.pds_host.as_str(),
@@ -286,7 +298,10 @@ pub struct DeactivateAccountResponse {}
 
 #[tracing::instrument]
 pub async fn deactivate_account_api(req: DeactivateAccountRequest) -> Result<(), PdsError> {
-    let agent = BskyAgent::builder().build().await.unwrap();
+    let agent = BskyAgent::builder().build().await.map_err(|error| {
+        tracing::error!("{}", error.to_string());
+        PdsError::Runtime
+    })?;
     login_helper(
         &agent,
         req.pds_host.as_str(),
@@ -309,7 +324,10 @@ pub struct MigratePreferencesRequest {
 
 #[tracing::instrument]
 pub async fn migrate_preferences_api(req: MigratePreferencesRequest) -> Result<(), PdsError> {
-    let agent = BskyAgent::builder().build().await.unwrap();
+    let agent = BskyAgent::builder().build().await.map_err(|error| {
+        tracing::error!("{}", error.to_string());
+        PdsError::Runtime
+    })?;
     login_helper(
         &agent,
         req.origin.as_str(),
@@ -338,7 +356,10 @@ pub struct RequestTokenRequest {
 
 #[tracing::instrument]
 pub async fn request_token_api(req: RequestTokenRequest) -> Result<(), PdsError> {
-    let agent = BskyAgent::builder().build().await.unwrap();
+    let agent = BskyAgent::builder().build().await.map_err(|error| {
+        tracing::error!("{}", error.to_string());
+        PdsError::Runtime
+    })?;
     login_helper(
         &agent,
         req.pds_host.as_str(),
@@ -364,7 +385,10 @@ pub struct MigratePlcRequest {
 
 #[tracing::instrument(skip(req))]
 pub async fn migrate_plc_api(req: MigratePlcRequest) -> Result<(), PdsError> {
-    let agent = BskyAgent::builder().build().await.unwrap();
+    let agent = BskyAgent::builder().build().await.map_err(|error| {
+        tracing::error!("{}", error.to_string());
+        PdsError::Runtime
+    })?;
     login_helper(
         &agent,
         req.destination.as_str(),

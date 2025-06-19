@@ -118,6 +118,9 @@ impl HomePage {
         let success_tx = self.success_tx.clone();
 
         tokio::spawn(async move {
+            success_tx
+                .send("Exporting Repo Started".to_string())
+                .unwrap();
             let request = ExportPDSRequest {
                 pds_host,
                 did,
@@ -173,6 +176,9 @@ impl HomePage {
         let success_tx = self.success_tx.clone();
 
         tokio::spawn(async move {
+            success_tx
+                .send("Exporting Blobs Started".to_string())
+                .unwrap();
             let request = ExportBlobsRequest {
                 destination: new_pds_host,
                 origin: old_pds_host,

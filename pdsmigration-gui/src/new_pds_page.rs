@@ -38,7 +38,7 @@ impl NewPdsPage {
     ) -> Self {
         let (login_tx, login_rx) = std::sync::mpsc::channel();
         Self {
-            new_pds_host: "".to_string(),
+            new_pds_host: "https://northsky.social".to_string(),
             new_handle: "".to_string(),
             page_tx,
             error_tx,
