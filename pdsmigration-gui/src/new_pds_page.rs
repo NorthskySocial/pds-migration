@@ -16,6 +16,7 @@ pub struct NewPdsPage {
     page_tx: Sender<Page>,
     success_tx: Sender<String>,
     old_pds_token: String,
+    #[allow(dead_code)]
     old_pds_refresh: String,
     old_pds_host: String,
     invite_code: String,
