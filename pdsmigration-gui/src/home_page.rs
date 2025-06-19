@@ -21,6 +21,7 @@ pub struct HomePage {
     old_pds_host: String,
     plc_token: String,
     user_recovery_key: String,
+    user_recovery_key_password: String,
     error_tx: Sender<GuiError>,
     success_tx: Sender<String>,
 }
@@ -46,6 +47,7 @@ impl HomePage {
             error_tx,
             success_tx,
             user_recovery_key: "".to_string(),
+            user_recovery_key_password: "".to_string(),
         }
     }
 
@@ -69,9 +71,19 @@ impl HomePage {
             styles::render_button(ui, "Request Token", || {
                 self.request_token();
             });
-            styles::render_button(ui, "Generate Recovery Key", || {
-                self.generate_recovery_key();
+            ui.horizontal(|ui| {
+                styles::render_button(ui, "Generate Recovery Key", || {
+                    self.generate_recovery_key();
+                });
+                styles::render_input(
+                    ui,
+                    "Password",
+                    &mut self.user_recovery_key_password,
+                    true,
+                    Some(""),
+                );
             });
+
             ui.horizontal(|ui| {
                 ui.horizontal(|ui| {
                     ui.vertical(|ui| {
@@ -336,7 +348,7 @@ impl HomePage {
 
         let options = SimpleFileOptions::default()
             .compression_method(zip::CompressionMethod::Stored)
-            .with_aes_encryption(AesMode::Aes256, "password");
+            .with_aes_encryption(AesMode::Aes256, self.user_recovery_key_password.as_str());
         zip.start_file("RotationKey", options).unwrap();
         zip.write_all(&secret_key_str.as_bytes()[..]).unwrap();
 
