@@ -397,21 +397,6 @@ pub async fn submit_plc(agent: &BskyAgent, signed_plc: Unknown) -> Result<(), Pd
 }
 
 #[tracing::instrument(skip(agent))]
-async fn account_status(agent: &BskyAgent) -> Result<(), PdsError> {
-    match agent.api.com.atproto.server.check_account_status().await {
-        Ok(output) => {
-            tracing::info!("Successfully Got Account Status");
-            tracing::debug!("{:?}", output);
-            Ok(())
-        }
-        Err(e) => {
-            tracing::error!("{:?}", e);
-            Err(PdsError::AccountStatus)
-        }
-    }
-}
-
-#[tracing::instrument(skip(agent))]
 pub async fn request_token(agent: &BskyAgent) -> Result<(), PdsError> {
     let result = agent
         .api
