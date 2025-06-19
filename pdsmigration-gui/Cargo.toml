@@ -10,7 +10,7 @@ include = [
 [dependencies]
 env_logger = "0.11.4"
 pdsmigration-common = { workspace = true }
-tokio = { version = "1.43.0" }
+tokio = { version = "1.43.0", features = ["rt-multi-thread", "time"] }
 bsky-sdk = "0.1.16"
 
 egui = { version = "0.31.0" }
