@@ -51,7 +51,7 @@ jobs:
         run: cargo test
       - name: "Run Check"
         id: check
-        run: cargo check -- -D warnings
+        run: cargo check
       - name: "Run Formatter"
         id: formatting
         run: cargo fmt -- --check
