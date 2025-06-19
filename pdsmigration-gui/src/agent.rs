@@ -16,18 +16,25 @@ pub async fn login_helper(
         Err(e) => {
             match e {
                 atrium_xrpc::Error::HttpClient(_e) => return Err(GuiError::InvalidPdsEndpoint),
-                atrium_xrpc::Error::XrpcResponse(e) => match e.error.unwrap() {
-                    XrpcErrorKind::Custom(_e) => {}
-                    XrpcErrorKind::Undefined(e) => {
-                        let error = e.error.unwrap();
-                        let message = e.message.unwrap();
-
-                        if error == "AuthenticationRequired"
-                            && message == "Invalid identifier or password"
-                        {
+                atrium_xrpc::Error::XrpcResponse(e) => match e.error {
+                    None => {
+                        return Err(GuiError::InvalidPdsEndpoint);
+                    }
+                    Some(e) => match e {
+                        XrpcErrorKind::Custom(e) => {
                             return Err(GuiError::InvalidLogin);
                         }
-                    }
+                        XrpcErrorKind::Undefined(e) => {
+                            let error = e.error.unwrap();
+                            let message = e.message.unwrap();
+
+                            if error == "AuthenticationRequired"
+                                && message == "Invalid identifier or password"
+                            {
+                                return Err(GuiError::InvalidLogin);
+                            }
+                        }
+                    },
                 },
                 _ => {}
             }

@@ -59,18 +59,23 @@ struct PdsMigrationApp {
     page_rx: Receiver<Page>,
     error_rx: Receiver<GuiError>,
     error_windows: Vec<ErrorWindow>,
+    success_rx: Receiver<String>,
+    success_windows: Vec<SuccessWindow>,
 }
 
 impl Default for PdsMigrationApp {
     fn default() -> Self {
         let (page_tx, page_rx) = std::sync::mpsc::channel();
         let (error_tx, error_rx) = std::sync::mpsc::channel();
+        let (success_tx, success_rx) = std::sync::mpsc::channel();
 
         Self {
-            page: Page::OldLogin(ExistingPdsPage::new(page_tx, error_tx)),
+            page: Page::OldLogin(ExistingPdsPage::new(page_tx, error_tx, success_tx)),
             page_rx,
             error_rx,
             error_windows: vec![],
+            success_rx,
+            success_windows: vec![],
         }
     }
 }
@@ -79,6 +84,7 @@ impl eframe::App for PdsMigrationApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.check_page_update();
         self.check_for_errors(ctx);
+        self.check_for_success(ctx);
 
         let mut new_error_windows = vec![];
         for error_window in &mut self.error_windows {
@@ -88,6 +94,15 @@ impl eframe::App for PdsMigrationApp {
             }
         }
         self.error_windows = new_error_windows;
+
+        let mut new_success_windows = vec![];
+        for success_window in &mut self.success_windows {
+            if success_window.open {
+                success_window.show(ctx);
+                new_success_windows.push(success_window.clone());
+            }
+        }
+        self.success_windows = new_success_windows;
 
         let styled_frame = styles::get_styled_frame();
         egui::CentralPanel::default()
@@ -124,6 +139,13 @@ impl PdsMigrationApp {
             self.error_windows.push(error_window);
         }
     }
+
+    pub fn check_for_success(&mut self, _ctx: &egui::Context) {
+        if let Ok(message) = self.success_rx.try_recv() {
+            let success_window = SuccessWindow::new(message);
+            self.success_windows.push(success_window);
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -148,6 +170,36 @@ impl ErrorWindow {
             .resizable(false)
             .show(ctx, |ui| {
                 ui.label(format!("{}", self.gui_error));
+                let btn = ui.button("Ok");
+                if btn.clicked() {
+                    self.open = false;
+                }
+            })
+    }
+}
+
+#[derive(Clone)]
+pub struct SuccessWindow {
+    open: bool,
+    message: String,
+}
+
+impl SuccessWindow {
+    pub fn new(message: String) -> Self {
+        Self {
+            open: true,
+            message,
+        }
+    }
+
+    pub fn show(&mut self, ctx: &egui::Context) -> Option<InnerResponse<Option<()>>> {
+        Window::new(self.message.clone())
+            .title_bar(false)
+            .open(&mut self.open.clone())
+            .vscroll(false)
+            .resizable(false)
+            .show(ctx, |ui| {
+                ui.label(format!("{}", self.message));
                 let btn = ui.button("Ok");
                 if btn.clicked() {
                     self.open = false;

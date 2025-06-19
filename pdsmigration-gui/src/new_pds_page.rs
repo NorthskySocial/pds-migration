@@ -14,7 +14,9 @@ pub struct NewPdsPage {
     new_email: String,
     error_tx: Sender<GuiError>,
     page_tx: Sender<Page>,
+    success_tx: Sender<String>,
     old_pds_token: String,
+    old_pds_refresh: String,
     old_pds_host: String,
     invite_code: String,
     did: String,
@@ -27,7 +29,9 @@ impl NewPdsPage {
     pub fn new(
         page_tx: Sender<Page>,
         error_tx: Sender<GuiError>,
+        success_tx: Sender<String>,
         old_pds_token: String,
+        old_pds_refresh: String,
         old_pds_host: String,
         did: String,
     ) -> Self {
@@ -37,8 +41,10 @@ impl NewPdsPage {
             new_handle: "".to_string(),
             page_tx,
             error_tx,
+            success_tx,
             new_password: "".to_string(),
             old_pds_token,
+            old_pds_refresh,
             old_pds_host,
             invite_code: "".to_string(),
             new_email: "".to_string(),
@@ -62,15 +68,28 @@ impl NewPdsPage {
                 if is_new_account {
                     styles::render_subtitle(ui, "Create New PDS Account!");
                     ui.vertical_centered(|ui| {
-                        styles::render_input(ui, "New PDS Host", &mut self.new_pds_host, false);
-                        styles::render_input(ui, "Email", &mut self.new_email, false);
-                        styles::render_input(ui, "Handle", &mut self.new_handle, false);
-                        styles::render_input(ui, "Password", &mut self.new_password, true);
+                        styles::render_input(
+                            ui,
+                            "New PDS Host",
+                            &mut self.new_pds_host,
+                            false,
+                            Some("https://northsky.social"),
+                        );
+                        styles::render_input(ui, "Email", &mut self.new_email, false, None);
+                        styles::render_input(
+                            ui,
+                            "Handle",
+                            &mut self.new_handle,
+                            false,
+                            Some("user.northsky.social"),
+                        );
+                        styles::render_input(ui, "Password", &mut self.new_password, true, None);
                         styles::render_input(
                             ui,
                             "Invite Code (Leave Blank if None)",
                             &mut self.invite_code,
                             false,
+                            None,
                         );
                         styles::render_button(ui, "Submit", || {
                             self.create_account();
@@ -79,9 +98,21 @@ impl NewPdsPage {
                 } else {
                     styles::render_subtitle(ui, "New PDS Login!");
                     ui.vertical_centered(|ui| {
-                        styles::render_input(ui, "New PDS Hosst", &mut self.new_pds_host, false);
-                        styles::render_input(ui, "Handle", &mut self.new_handle, false);
-                        styles::render_input(ui, "Password", &mut self.new_password, true);
+                        styles::render_input(
+                            ui,
+                            "New PDS Host",
+                            &mut self.new_pds_host,
+                            false,
+                            Some("https://northsky.social"),
+                        );
+                        styles::render_input(
+                            ui,
+                            "Handle",
+                            &mut self.new_handle,
+                            false,
+                            Some("user.northsky.social"),
+                        );
+                        styles::render_input(ui, "Password", &mut self.new_password, true, None);
                         styles::render_button(ui, "Submit", || {
                             self.new_session_login();
                         });
@@ -101,6 +132,7 @@ impl NewPdsPage {
         let new_password = self.new_password.to_string();
         let page_tx = self.page_tx.clone();
         let error_tx = self.error_tx.clone();
+        let success_tx = self.success_tx.clone();
         let old_pds_token = self.old_pds_token.clone();
         let old_pds_host = self.old_pds_host.clone();
 
@@ -121,6 +153,7 @@ impl NewPdsPage {
                         .send(Page::Home(HomePage::new(
                             page_tx.clone(),
                             error_tx,
+                            success_tx,
                             old_pds_token,
                             new_pds_token,
                             old_pds_host,
@@ -158,21 +191,21 @@ impl NewPdsPage {
                 did: did.clone(),
                 token: token.clone(),
             };
-            let token = match pdsmigration_common::get_service_auth_api(service_auth_request).await
-            {
-                Ok(res) => res,
-                Err(_pds_error) => {
-                    error_tx.send(GuiError::Runtime).unwrap();
-                    return;
-                }
-            };
+            let service_token =
+                match pdsmigration_common::get_service_auth_api(service_auth_request).await {
+                    Ok(res) => res,
+                    Err(_pds_error) => {
+                        error_tx.send(GuiError::Runtime).unwrap();
+                        return;
+                    }
+                };
 
             let create_account_request = CreateAccountApiRequest {
                 email,
                 handle,
                 invite_code,
                 password,
-                token,
+                token: service_token,
                 pds_host: new_pds_host,
                 did,
                 recovery_key: None,

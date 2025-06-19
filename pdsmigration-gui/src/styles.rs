@@ -63,7 +63,13 @@ pub fn render_subtitle(ui: &mut egui::Ui, text: &str) {
 }
 
 /// Renders a styled input field with a given label and control text.
-pub fn render_input(ui: &mut egui::Ui, label: &str, text: &mut String, is_password: bool) {
+pub fn render_input(
+    ui: &mut egui::Ui,
+    label: &str,
+    text: &mut String,
+    is_password: bool,
+    text_hint: Option<&str>,
+) {
     ui.vertical_centered(|ui| {
         ui.add_space(WIDGET_SPACING_BASE);
         ui.label(RichText::new(label).color(FRAME_TEXT_COLOR));
@@ -74,14 +80,16 @@ pub fn render_input(ui: &mut egui::Ui, label: &str, text: &mut String, is_passwo
             .inner_margin(egui::vec2(WIDGET_SPACING_BASE, WIDGET_SPACING_BASE))
             .show(ui, |ui| {
                 ui.set_max_width(INPUT_WIDTH * 1.10);
-                ui.add(
-                    egui::TextEdit::singleline(text)
-                        .text_color(FRAME_TEXT_COLOR)
-                        .background_color(FRAME_BG_COLOR)
-                        .password(is_password)
-                        .frame(false)
-                        .desired_width(INPUT_WIDTH),
-                );
+                let mut edit_text = egui::TextEdit::singleline(text)
+                    .text_color(FRAME_TEXT_COLOR)
+                    .background_color(FRAME_BG_COLOR)
+                    .password(is_password)
+                    .frame(false)
+                    .desired_width(INPUT_WIDTH);
+                if let Some(hint) = text_hint {
+                    edit_text = edit_text.hint_text(hint);
+                }
+                ui.add(edit_text);
             });
         ui.add_space(WIDGET_SPACING_BASE);
     });
@@ -103,6 +111,32 @@ pub fn render_button(ui: &mut egui::Ui, label: &str, callback: impl FnOnce()) {
         if ui.add(button).clicked() {
             callback();
         }
+    });
+
+    ui.add_space(WIDGET_SPACING_BASE);
+}
+
+/// Renders a styled button that runs a callback function when clicked.
+pub fn render_theme_buttons(ui: &mut egui::Ui, callback: impl FnOnce()) {
+    ui.add_space(WIDGET_SPACING_BASE);
+
+    ui.vertical_centered(|ui| {
+        ui.spacing_mut().button_padding =
+            egui::vec2(4.0 * WIDGET_SPACING_BASE, 2.0 * WIDGET_SPACING_BASE);
+
+        let text_label = egui::RichText::new("Light").color(FRAME_TEXT_COLOR);
+        let button = egui::Button::new(text_label)
+            .fill(BUTTON_BG_COLOR)
+            .corner_radius(CornerRadius::same(0));
+
+        if ui.add(button).clicked() {
+            callback();
+        }
+
+        let text_label = egui::RichText::new("Light").color(FRAME_TEXT_COLOR);
+        let button = egui::Button::new(text_label)
+            .fill(BUTTON_BG_COLOR)
+            .corner_radius(CornerRadius::same(0));
     });
 
     ui.add_space(WIDGET_SPACING_BASE);

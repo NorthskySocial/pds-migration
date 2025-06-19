@@ -17,12 +17,14 @@ pub struct HomePage {
     plc_token: String,
     user_recovery_key: String,
     error_tx: Sender<GuiError>,
+    success_tx: Sender<String>,
 }
 
 impl HomePage {
     pub fn new(
         _page_tx: Sender<Page>,
         error_tx: Sender<GuiError>,
+        success_tx: Sender<String>,
         old_pds_token: String,
         new_pds_token: String,
         old_pds_host: String,
@@ -37,6 +39,7 @@ impl HomePage {
             old_pds_host,
             plc_token: "".to_string(),
             error_tx,
+            success_tx,
             user_recovery_key: "".to_string(),
         }
     }
@@ -92,6 +95,7 @@ impl HomePage {
         let pds_host = self.old_pds_host.clone();
         let token = self.old_pds_token.clone();
         let error_tx = self.error_tx.clone();
+        let success_tx = self.success_tx.clone();
 
         tokio::spawn(async move {
             let request = ExportPDSRequest {
@@ -102,7 +106,9 @@ impl HomePage {
             match pdsmigration_common::export_pds_api(request).await {
                 Ok(_) => {
                     // After parsing the response, notify the GUI thread of the increment value.
-                    // let _ = tx.send(1);
+                    success_tx
+                        .send("Export Repo Completed".to_string())
+                        .unwrap();
                 }
                 Err(_pds_error) => {
                     error_tx.send(GuiError::NoMissingBlobs).unwrap();
@@ -116,6 +122,7 @@ impl HomePage {
         let pds_host = self.new_pds_host.to_string();
         let token = self.new_pds_token.clone();
         let error_tx = self.error_tx.clone();
+        let success_tx = self.success_tx.clone();
 
         tokio::spawn(async move {
             let request = ImportPDSRequest {
@@ -125,8 +132,9 @@ impl HomePage {
             };
             match pdsmigration_common::import_pds_api(request).await {
                 Ok(_) => {
-                    // After parsing the response, notify the GUI thread of the increment value.
-                    // let _ = tx.send(1);
+                    success_tx
+                        .send("Import Repo Completed".to_string())
+                        .unwrap();
                 }
                 Err(_) => {
                     error_tx.send(GuiError::Runtime).unwrap();
@@ -142,6 +150,7 @@ impl HomePage {
         let old_token = self.old_pds_token.clone();
         let new_token = self.new_pds_token.clone();
         let error_tx = self.error_tx.clone();
+        let success_tx = self.success_tx.clone();
 
         tokio::spawn(async move {
             let request = ExportBlobsRequest {
@@ -153,8 +162,9 @@ impl HomePage {
             };
             match pdsmigration_common::export_blobs_api(request).await {
                 Ok(_) => {
-                    // After parsing the response, notify the GUI thread of the increment value.
-                    // let _ = tx.send(1);
+                    success_tx
+                        .send("Export Blobs Completed".to_string())
+                        .unwrap();
                 }
                 Err(_pds_error) => {
                     error_tx.send(GuiError::Runtime).unwrap();
@@ -168,6 +178,7 @@ impl HomePage {
         let pds_host = self.new_pds_host.clone();
         let token = self.new_pds_token.clone();
         let error_tx = self.error_tx.clone();
+        let success_tx = self.success_tx.clone();
 
         tokio::spawn(async move {
             let request = UploadBlobsRequest {
@@ -177,8 +188,9 @@ impl HomePage {
             };
             match pdsmigration_common::upload_blobs_api(request).await {
                 Ok(_) => {
-                    // After parsing the response, notify the GUI thread of the increment value.
-                    // let _ = tx.send(1);
+                    success_tx
+                        .send("Upload Blobs Completed".to_string())
+                        .unwrap();
                 }
                 Err(_pds_error) => {
                     error_tx.send(GuiError::Runtime).unwrap();
@@ -199,6 +211,7 @@ impl HomePage {
             false => Some(self.user_recovery_key.clone()),
         };
         let error_tx = self.error_tx.clone();
+        let success_tx = self.success_tx.clone();
 
         tokio::spawn(async move {
             let request = MigratePlcRequest {
@@ -212,7 +225,9 @@ impl HomePage {
             };
             match pdsmigration_common::migrate_plc_api(request).await {
                 Ok(_) => {
-                    // let _ = tx.send(1);
+                    success_tx
+                        .send("Migrate PLC Completed".to_string())
+                        .unwrap();
                 }
                 Err(_pds_error) => {
                     error_tx.send(GuiError::Runtime).unwrap();
@@ -228,6 +243,7 @@ impl HomePage {
         let origin_token = self.old_pds_token.clone();
         let destination_token = self.new_pds_token.clone();
         let error_tx = self.error_tx.clone();
+        let success_tx = self.success_tx.clone();
 
         tokio::spawn(async move {
             let request = MigratePreferencesRequest {
@@ -239,8 +255,9 @@ impl HomePage {
             };
             match pdsmigration_common::migrate_preferences_api(request).await {
                 Ok(_) => {
-                    // After parsing the response, notify the GUI thread of the increment value.
-                    // let _ = tx.send(1);
+                    success_tx
+                        .send("Migrate Preferences Completed".to_string())
+                        .unwrap();
                 }
                 Err(_pds_error) => {
                     error_tx.send(GuiError::Runtime).unwrap();
@@ -254,6 +271,7 @@ impl HomePage {
         let pds_host = self.old_pds_host.clone();
         let token = self.old_pds_token.clone();
         let error_tx = self.error_tx.clone();
+        let success_tx = self.success_tx.clone();
 
         tokio::spawn(async move {
             let request = RequestTokenRequest {
@@ -263,7 +281,9 @@ impl HomePage {
             };
             match pdsmigration_common::request_token_api(request).await {
                 Ok(_) => {
-                    // let _ = tx.send(1);
+                    success_tx
+                        .send("Request Token Completed".to_string())
+                        .unwrap();
                 }
                 Err(_pds_error) => {
                     error_tx.send(GuiError::Runtime).unwrap();
@@ -277,6 +297,7 @@ impl HomePage {
         let pds_host = self.new_pds_host.clone();
         let token = self.new_pds_token.clone();
         let error_tx = self.error_tx.clone();
+        let success_tx = self.success_tx.clone();
 
         tokio::spawn(async move {
             let request = ActivateAccountRequest {
@@ -286,7 +307,9 @@ impl HomePage {
             };
             match pdsmigration_common::activate_account_api(request).await {
                 Ok(_) => {
-                    // let _ = tx.send(1);
+                    success_tx
+                        .send("Activate Account Completed".to_string())
+                        .unwrap();
                 }
                 Err(_pds_error) => {
                     error_tx.send(GuiError::Runtime).unwrap();
@@ -297,9 +320,10 @@ impl HomePage {
 
     fn deactivate_account(&self) {
         let did = self.did.clone();
-        let pds_host = self.new_pds_host.clone();
-        let token = self.new_pds_token.clone();
+        let pds_host = self.old_pds_host.clone();
+        let token = self.old_pds_token.clone();
         let error_tx = self.error_tx.clone();
+        let success_tx = self.success_tx.clone();
 
         tokio::spawn(async move {
             let request = DeactivateAccountRequest {
@@ -309,7 +333,9 @@ impl HomePage {
             };
             match pdsmigration_common::deactivate_account_api(request).await {
                 Ok(_) => {
-                    // let _ = tx.send(1);
+                    success_tx
+                        .send("Deactivate Account Completed".to_string())
+                        .unwrap();
                 }
                 Err(_pds_error) => {
                     error_tx.send(GuiError::Runtime).unwrap();

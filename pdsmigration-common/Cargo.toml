@@ -2,6 +2,14 @@
 name = "pdsmigration-common"
 version = "0.1.0"
 edition = "2021"
+include = [
+    "**/*.rs",
+    "Cargo.toml",
+]
+license = "MIT"
+publish = true
+repository = "https://github.com/NorthskySocial/pds-migration"
+description = "Common framework for PDS Migration"
 
 [dependencies]
 serde = { version = "1.0.204", features = ["derive"] }

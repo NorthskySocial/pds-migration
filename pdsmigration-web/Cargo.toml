@@ -2,6 +2,11 @@
 name = "pdsmigration-web"
 version = "0.1.0"
 edition = "2021"
+include = [
+    "**/*.rs",
+    "Cargo.toml",
+]
+license = "MIT"
 
 [dependencies]
 dotenvy = "0.15.7"
