@@ -232,7 +232,7 @@ pub async fn export_blobs_api(req: ExportBlobsRequest) -> Result<(), PdsError> {
             }
             Err(_) => {
                 tracing::error!("Failed to determine missing blobs");
-                return Err(PdsError::Validation);
+                // return Err(PdsError::Validation);
             }
         }
     }
