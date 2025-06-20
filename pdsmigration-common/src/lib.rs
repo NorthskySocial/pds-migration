@@ -10,7 +10,6 @@ use bsky_sdk::BskyAgent;
 use ipld_core::cid::Cid;
 use serde::{Deserialize, Serialize};
 use std::io::ErrorKind;
-use std::path::PathBuf;
 
 pub mod agent;
 pub mod errors;
