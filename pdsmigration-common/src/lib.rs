@@ -198,16 +198,16 @@ pub async fn export_blobs_api(req: ExportBlobsRequest) -> Result<(), PdsError> {
         req.origin_token.as_str(),
     )
     .await?;
-    for missing_blob in &missing_blobs {
-        match tokio::fs::create_dir(session.did.as_str().replace(":", "-")).await {
-            Ok(_) => {}
-            Err(e) => {
-                if e.kind() != ErrorKind::AlreadyExists {
-                    tracing::error!("Error creating directory: {:?}", e);
-                    return Err(PdsError::Validation);
-                }
+    match tokio::fs::create_dir(session.did.as_str().replace(":", "-")).await {
+        Ok(_) => {}
+        Err(e) => {
+            if e.kind() != ErrorKind::AlreadyExists {
+                tracing::error!("Error creating directory: {:?}", e);
+                return Err(PdsError::Validation);
             }
         }
+    }
+    for missing_blob in &missing_blobs {
         match get_blob(&agent, missing_blob.cid.clone(), session.did.clone()).await {
             Ok(output) => {
                 tracing::info!("Successfully fetched missing blob");
