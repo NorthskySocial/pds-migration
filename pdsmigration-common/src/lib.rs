@@ -254,8 +254,14 @@ pub async fn upload_blobs_api(req: UploadBlobsRequest) -> Result<(), PdsError> {
         Ok(output) => blob_dir = output,
         Err(_) => return Err(PdsError::Validation),
     }
-    while let Some(blob) = blob_dir.next_entry().await.unwrap() {
-        let file = tokio::fs::read(blob.path()).await.unwrap();
+    while let Some(blob) = blob_dir.next_entry().await.map_err(|error| {
+        tracing::error!("{}", error.to_string());
+        PdsError::Runtime
+    })? {
+        let file = tokio::fs::read(blob.path()).await.map_err(|error| {
+            tracing::error!("{}", error.to_string());
+            PdsError::Runtime
+        })?;
         upload_blob(&agent, file).await?;
     }
 
