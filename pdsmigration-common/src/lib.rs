@@ -198,7 +198,9 @@ pub async fn export_blobs_api(req: ExportBlobsRequest) -> Result<(), PdsError> {
         req.origin_token.as_str(),
     )
     .await?;
-    match tokio::fs::create_dir(session.did.as_str().replace(":", "-")).await {
+    let mut path = std::env::current_dir().unwrap();
+    path.push(session.did.as_str().replace(":", "-"));
+    match tokio::fs::create_dir(path.as_path()).await {
         Ok(_) => {}
         Err(e) => {
             if e.kind() != ErrorKind::AlreadyExists {
@@ -211,7 +213,8 @@ pub async fn export_blobs_api(req: ExportBlobsRequest) -> Result<(), PdsError> {
         match get_blob(&agent, missing_blob.cid.clone(), session.did.clone()).await {
             Ok(output) => {
                 tracing::info!("Successfully fetched missing blob");
-                let mut path = PathBuf::from(session.did.as_str().replace(":", "-"));
+                let mut path = std::env::current_dir().unwrap();
+                path.push(session.did.as_str().replace(":", "-"));
                 path.push(
                     missing_blob
                         .record_uri
@@ -259,7 +262,9 @@ pub async fn upload_blobs_api(req: UploadBlobsRequest) -> Result<(), PdsError> {
     .await?;
 
     let mut blob_dir;
-    match tokio::fs::read_dir(session.did.as_str().replace(":", "-")).await {
+    let mut path = std::env::current_dir().unwrap();
+    path.push(session.did.as_str().replace(":", "-"));
+    match tokio::fs::read_dir(path.as_path()).await {
         Ok(output) => blob_dir = output,
         Err(_) => return Err(PdsError::Validation),
     }

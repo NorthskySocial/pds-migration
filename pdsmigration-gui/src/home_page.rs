@@ -25,6 +25,7 @@ pub struct HomePage {
     user_recovery_key_password: String,
     error_tx: Sender<GuiError>,
     success_tx: Sender<String>,
+    // storage_dir: std::path::Path,
 }
 
 impl HomePage {

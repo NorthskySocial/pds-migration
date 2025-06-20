@@ -285,11 +285,11 @@ pub async fn account_import(agent: &BskyAgent, filepath: &str) -> Result<(), Pds
         .await;
     match result {
         Ok(_) => {
-            tracing::info!("Successfully signed token");
+            tracing::info!("Successfully imported account");
             Ok(())
         }
         Err(e) => {
-            eprintln!("Error importing: {:?}", e);
+            tracing::error!("Error importing: {:?}", e);
             Err(PdsError::AccountImport)
         }
     }
