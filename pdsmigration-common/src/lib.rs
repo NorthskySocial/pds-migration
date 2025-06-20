@@ -10,7 +10,7 @@ use bsky_sdk::BskyAgent;
 use ipld_core::cid::Cid;
 use serde::{Deserialize, Serialize};
 use std::io::ErrorKind;
-use std::path::MAIN_SEPARATOR_STR;
+use std::path::PathBuf;
 
 pub mod agent;
 pub mod errors;
@@ -211,17 +211,21 @@ pub async fn export_blobs_api(req: ExportBlobsRequest) -> Result<(), PdsError> {
         match get_blob(&agent, missing_blob.cid.clone(), session.did.clone()).await {
             Ok(output) => {
                 tracing::info!("Successfully fetched missing blob");
-                tokio::fs::write(
-                    session.did.as_str().replace(":", "-")
-                        + MAIN_SEPARATOR_STR
-                        + missing_blob.record_uri.as_str().split("/").last().unwrap(),
-                    output,
-                )
-                .await
-                .map_err(|error| {
-                    tracing::error!("{}", error.to_string());
-                    PdsError::Runtime
-                })?;
+                let mut path = PathBuf::from(session.did.as_str().replace(":", "-"));
+                path.push(
+                    missing_blob
+                        .record_uri
+                        .as_str()
+                        .split("/")
+                        .last()
+                        .unwrap_or("fallback"),
+                );
+                tokio::fs::write(path.as_path(), output)
+                    .await
+                    .map_err(|error| {
+                        tracing::error!("{}", error.to_string());
+                        PdsError::AccountExport
+                    })?;
             }
             Err(_) => {
                 tracing::error!("Failed to determine missing blobs");
