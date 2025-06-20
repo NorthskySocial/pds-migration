@@ -2,6 +2,7 @@ use crate::errors::GuiError;
 use crate::{styles, Page};
 use egui::Ui;
 use multibase::Base::Base58Btc;
+use pdsmigration_common::errors::PdsError;
 use pdsmigration_common::{
     ActivateAccountRequest, DeactivateAccountRequest, ExportBlobsRequest, ExportPDSRequest,
     ImportPDSRequest, MigratePlcRequest, MigratePreferencesRequest, RequestTokenRequest,
@@ -133,9 +134,18 @@ impl HomePage {
                         .send("Export Repo Completed".to_string())
                         .unwrap();
                 }
-                Err(_pds_error) => {
-                    error_tx.send(GuiError::NoMissingBlobs).unwrap();
-                }
+                Err(pds_error) => match pds_error {
+                    PdsError::Login => {
+                        error_tx.send(GuiError::InvalidLogin).unwrap();
+                    }
+                    PdsError::Runtime => {
+                        error_tx.send(GuiError::Runtime).unwrap();
+                    }
+                    PdsError::AccountExport => {}
+                    _ => {
+                        error_tx.send(GuiError::Other).unwrap();
+                    }
+                },
             }
         });
     }

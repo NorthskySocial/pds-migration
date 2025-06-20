@@ -132,7 +132,11 @@ pub async fn import_pds_api(req: ImportPDSRequest) -> Result<(), PdsError> {
         req.token.as_str(),
     )
     .await?;
-    account_import(&agent, (session.did.as_str().to_string() + ".car").as_str()).await?;
+    account_import(
+        &agent,
+        (session.did.as_str().to_string().replace(":", "-") + ".car").as_str(),
+    )
+    .await?;
     Ok(())
 }
 
@@ -194,7 +198,7 @@ pub async fn export_blobs_api(req: ExportBlobsRequest) -> Result<(), PdsError> {
     )
     .await?;
     for missing_blob in &missing_blobs {
-        match tokio::fs::create_dir(session.did.as_str()).await {
+        match tokio::fs::create_dir(session.did.as_str().replace(":", "-")).await {
             Ok(_) => {}
             Err(e) => {
                 if e.kind() != ErrorKind::AlreadyExists {
@@ -207,7 +211,7 @@ pub async fn export_blobs_api(req: ExportBlobsRequest) -> Result<(), PdsError> {
             Ok(output) => {
                 tracing::info!("Successfully fetched missing blob");
                 tokio::fs::write(
-                    String::from(session.did.as_str())
+                    session.did.as_str().replace(":", "-")
                         + "/"
                         + missing_blob.record_uri.as_str().split("/").last().unwrap(),
                     output,
@@ -250,7 +254,7 @@ pub async fn upload_blobs_api(req: UploadBlobsRequest) -> Result<(), PdsError> {
     .await?;
 
     let mut blob_dir;
-    match tokio::fs::read_dir(session.did.as_str()).await {
+    match tokio::fs::read_dir(session.did.as_str().replace(":", "-")).await {
         Ok(output) => blob_dir = output,
         Err(_) => return Err(PdsError::Validation),
     }

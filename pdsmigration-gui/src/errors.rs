@@ -10,6 +10,8 @@ pub enum GuiError {
     InvalidLogin,
     #[display("Runtime Exception")]
     Runtime,
+    #[display("Other Exception")]
+    Other,
     #[display("Success")]
     Success,
 }

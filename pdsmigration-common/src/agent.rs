@@ -313,7 +313,7 @@ pub async fn account_export(agent: &BskyAgent, did: &Did) -> Result<(), PdsError
         .await;
     match result {
         Ok(output) => {
-            tokio::fs::write(did.as_str().to_string() + ".car", output)
+            tokio::fs::write(did.as_str().to_string().replace(":", "-") + ".car", output)
                 .await
                 .map_err(|error| {
                     tracing::error!("{}", error.to_string());
