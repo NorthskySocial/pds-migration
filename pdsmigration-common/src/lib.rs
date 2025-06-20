@@ -214,12 +214,7 @@ pub async fn export_blobs_api(req: ExportBlobsRequest) -> Result<(), PdsError> {
                 tokio::fs::write(
                     session.did.as_str().replace(":", "-")
                         + MAIN_SEPARATOR_STR
-                        + missing_blob
-                            .record_uri
-                            .as_str()
-                            .split(MAIN_SEPARATOR_STR)
-                            .last()
-                            .unwrap(),
+                        + missing_blob.record_uri.as_str().split("/").last().unwrap(),
                     output,
                 )
                 .await
