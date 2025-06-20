@@ -203,9 +203,14 @@ impl HomePage {
                         .send("Export Blobs Completed".to_string())
                         .unwrap();
                 }
-                Err(_pds_error) => {
-                    error_tx.send(GuiError::Runtime).unwrap();
-                }
+                Err(pds_error) => match pds_error {
+                    PdsError::Validation => {
+                        error_tx.send(GuiError::Other).unwrap();
+                    }
+                    _ => {
+                        error_tx.send(GuiError::Runtime).unwrap();
+                    }
+                },
             }
         });
     }
