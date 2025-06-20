@@ -158,6 +158,7 @@ impl HomePage {
         let success_tx = self.success_tx.clone();
 
         tokio::spawn(async move {
+            success_tx.send("Import Repo Started".to_string()).unwrap();
             let request = ImportPDSRequest {
                 pds_host,
                 did,
@@ -217,6 +218,7 @@ impl HomePage {
         let success_tx = self.success_tx.clone();
 
         tokio::spawn(async move {
+            success_tx.send("Upload Blobs Started".to_string()).unwrap();
             let request = UploadBlobsRequest {
                 pds_host,
                 did,
@@ -250,6 +252,7 @@ impl HomePage {
         let success_tx = self.success_tx.clone();
 
         tokio::spawn(async move {
+            success_tx.send("Migrate PLC Started".to_string()).unwrap();
             let request = MigratePlcRequest {
                 destination,
                 destination_token,
@@ -282,6 +285,9 @@ impl HomePage {
         let success_tx = self.success_tx.clone();
 
         tokio::spawn(async move {
+            success_tx
+                .send("Migrate Preferences Started".to_string())
+                .unwrap();
             let request = MigratePreferencesRequest {
                 destination,
                 destination_token,
@@ -310,6 +316,9 @@ impl HomePage {
         let success_tx = self.success_tx.clone();
 
         tokio::spawn(async move {
+            success_tx
+                .send("Request Token Started".to_string())
+                .unwrap();
             let request = RequestTokenRequest {
                 pds_host,
                 did,
@@ -379,6 +388,9 @@ impl HomePage {
         let success_tx = self.success_tx.clone();
 
         tokio::spawn(async move {
+            success_tx
+                .send("Activate Account Started".to_string())
+                .unwrap();
             let request = ActivateAccountRequest {
                 pds_host,
                 did,
@@ -405,6 +417,9 @@ impl HomePage {
         let success_tx = self.success_tx.clone();
 
         tokio::spawn(async move {
+            success_tx
+                .send("Deactivate Account Started".to_string())
+                .unwrap();
             let request = DeactivateAccountRequest {
                 pds_host,
                 did,

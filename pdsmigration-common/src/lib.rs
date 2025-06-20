@@ -10,6 +10,7 @@ use bsky_sdk::BskyAgent;
 use ipld_core::cid::Cid;
 use serde::{Deserialize, Serialize};
 use std::io::ErrorKind;
+use std::path::MAIN_SEPARATOR_STR;
 
 pub mod agent;
 pub mod errors;
@@ -212,8 +213,13 @@ pub async fn export_blobs_api(req: ExportBlobsRequest) -> Result<(), PdsError> {
                 tracing::info!("Successfully fetched missing blob");
                 tokio::fs::write(
                     session.did.as_str().replace(":", "-")
-                        + "/"
-                        + missing_blob.record_uri.as_str().split("/").last().unwrap(),
+                        + MAIN_SEPARATOR_STR
+                        + missing_blob
+                            .record_uri
+                            .as_str()
+                            .split(MAIN_SEPARATOR_STR)
+                            .last()
+                            .unwrap(),
                     output,
                 )
                 .await
