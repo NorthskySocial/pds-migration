@@ -1,5 +1,6 @@
+use crate::app::Page;
 use crate::errors::GuiError;
-use crate::{styles, Page};
+use crate::styles;
 use egui::Ui;
 use multibase::Base::Base58Btc;
 use pdsmigration_common::errors::PdsError;
@@ -96,11 +97,11 @@ impl HomePage {
                         ui.label("User Recovery Key (optional)");
                         ui.text_edit_singleline(&mut self.user_recovery_key);
                     });
-                    ui.vertical(|ui| {
-                        if ui.button("Migrate PLC").clicked() {
-                            self.migrate_plc();
-                        }
-                    });
+                });
+            });
+            ui.horizontal(|ui| {
+                styles::render_button(ui, "Migrate with private key", || {
+                    self.generate_recovery_key();
                 });
             });
             styles::render_button(ui, "Activate New Account", || {
@@ -381,7 +382,7 @@ impl HomePage {
             .compression_method(zip::CompressionMethod::Stored)
             .with_aes_encryption(AesMode::Aes256, self.user_recovery_key_password.as_str());
         zip.start_file("RotationKey", options).unwrap();
-        zip.write_all(&secret_key_str.as_bytes()[..]).unwrap();
+        zip.write_all(secret_key_str.as_bytes()).unwrap();
 
         zip.finish().unwrap();
     }

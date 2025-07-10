@@ -1,6 +1,6 @@
 [package]
 name = "pdsmigration-gui"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 include = [
     "**/*.rs",
@@ -8,16 +8,10 @@ include = [
 ]
 
 [dependencies]
-env_logger = "0.11.4"
 pdsmigration-common = { workspace = true }
-tokio = { version = "1.43.0", features = ["rt-multi-thread", "time"] }
 bsky-sdk = "0.1.16"
-
 egui = { version = "0.31.0" }
-eframe = { version = "0.31.0", features = [
-    "default",
-    "__screenshot", # __screenshot is so we can dump a screenshot using EFRAME_SCREENSHOT_TO
-] }
+eframe = { version = "0.31", features = ["glow", "wgpu"] }
 derive_more = "2.0.1"
 atrium-xrpc = "0.12.1"
 zip = "4.1.0"
@@ -25,3 +19,5 @@ secp256k1 = { version = "0.31.0", features = ["rand"] }
 multibase = "0.9.1"
 unsigned-varint = "0.8.0"
 rand = "0.9.1"
+env_logger = "0.11.8"
+tokio = { version = "1.43.1", features = ["rt-multi-thread", "time"] }

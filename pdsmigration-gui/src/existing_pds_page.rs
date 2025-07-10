@@ -1,7 +1,8 @@
 use crate::agent::login_helper;
+use crate::app::Page;
 use crate::errors::GuiError;
 use crate::new_pds_page::NewPdsPage;
-use crate::{styles, Page};
+use crate::styles;
 use bsky_sdk::BskyAgent;
 use egui::Ui;
 use std::sync::mpsc::Sender;
@@ -32,12 +33,12 @@ impl ExistingPdsPage {
     }
 
     pub fn show(&mut self, ui: &mut Ui) {
-        styles::render_subtitle(ui, "Old PDS Login!");
+        styles::render_subtitle(ui, "Current PDS Login");
 
         ui.vertical_centered(|ui| {
             styles::render_input(
                 ui,
-                "Old PDS Host",
+                "Current PDS Host",
                 &mut self.old_pds_host,
                 false,
                 Some("https://bsky.social"),

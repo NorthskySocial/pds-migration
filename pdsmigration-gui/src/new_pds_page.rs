@@ -1,7 +1,8 @@
 use crate::agent::login_helper;
+use crate::app::Page;
 use crate::errors::GuiError;
 use crate::home_page::HomePage;
-use crate::{styles, Page};
+use crate::styles;
 use bsky_sdk::BskyAgent;
 use egui::Ui;
 use pdsmigration_common::{CreateAccountApiRequest, ServiceAuthRequest};
@@ -16,7 +17,6 @@ pub struct NewPdsPage {
     page_tx: Sender<Page>,
     success_tx: Sender<String>,
     old_pds_token: String,
-    #[allow(dead_code)]
     old_pds_refresh: String,
     old_pds_host: String,
     invite_code: String,

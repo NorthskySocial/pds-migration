@@ -18,5 +18,15 @@ ipld-core = "0.4.1"
 tracing = "0.1.41"
 serde_json = "1.0.134"
 reqwest = "0.12.12"
-tokio = { version = "1.43.0", features = ["fs"] }
 derive_more = { version = "2.0.1" ,features = ["display",  "error"]}
+
+# native:
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+env_logger = "0.11.8"
+tokio = { version = "1.43.1", features = ["fs"] }
+
+# web:
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen-futures = "0.4.50"
+web-sys = "0.3.70"              # to access the DOM (to hide the loading text)
+tokio = { version = "1.43.1" }

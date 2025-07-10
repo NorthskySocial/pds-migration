@@ -38,6 +38,9 @@ pub fn get_styled_frame() -> egui::Frame {
 pub fn setup_fonts(ctx: &egui::Context) {
     let mut fonts = egui::FontDefinitions::default();
 
+    let mut style = egui::Style::default();
+    style.visuals.dark_mode = true;
+    ctx.set_style(style);
     fonts.font_data.insert(
         MAIN_FONT_NAME.to_owned(),
         egui::FontData::from_static(include_bytes!("../assets/Geist-VariableFont_wght.ttf")).into(),
