@@ -73,7 +73,7 @@ pub fn render_input(
     is_password: bool,
     text_hint: Option<&str>,
 ) {
-    ui.vertical_centered(|ui| {
+    ui.vertical(|ui| {
         ui.add_space(WIDGET_SPACING_BASE);
         ui.label(RichText::new(label).color(FRAME_TEXT_COLOR));
 
@@ -102,7 +102,7 @@ pub fn render_input(
 pub fn render_button(ui: &mut egui::Ui, label: &str, callback: impl FnOnce()) {
     ui.add_space(WIDGET_SPACING_BASE);
 
-    ui.vertical_centered(|ui| {
+    ui.vertical(|ui| {
         ui.spacing_mut().button_padding =
             egui::vec2(4.0 * WIDGET_SPACING_BASE, 2.0 * WIDGET_SPACING_BASE);
 

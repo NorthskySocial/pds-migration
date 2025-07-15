@@ -2,6 +2,7 @@ use crate::agent::login_helper;
 use crate::app::Page;
 use crate::errors::GuiError;
 use crate::home_page::HomePage;
+use crate::session_config::{NewSessionConfig, OldSessionConfig, SessionConfig};
 use crate::styles;
 use bsky_sdk::BskyAgent;
 use egui::Ui;
@@ -150,16 +151,23 @@ impl NewPdsPage {
                 Ok(res) => {
                     let new_pds_token = res.access_jwt.clone();
                     let did = res.did.as_str().to_string();
+                    let session_config = SessionConfig {
+                        did: Some(did),
+                        old_session_config: Some(OldSessionConfig {
+                            old_pds_token,
+                            old_pds_host,
+                        }),
+                        new_session_config: Some(NewSessionConfig {
+                            new_pds_token,
+                            new_pds_host,
+                        }),
+                    };
                     page_tx
                         .send(Page::Home(HomePage::new(
                             page_tx.clone(),
                             error_tx,
                             success_tx,
-                            old_pds_token,
-                            new_pds_token,
-                            old_pds_host,
-                            new_pds_host,
-                            did,
+                            session_config,
                         )))
                         .unwrap();
                 }

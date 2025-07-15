@@ -1,7 +1,8 @@
 use crate::app::Page;
 use crate::errors::GuiError;
+use crate::session_config::SessionConfig;
 use crate::styles;
-use egui::Ui;
+use egui::{CollapsingHeader, Ui};
 use multibase::Base::Base58Btc;
 use pdsmigration_common::errors::PdsError;
 use pdsmigration_common::{
@@ -16,16 +17,12 @@ use zip::write::SimpleFileOptions;
 use zip::{AesMode, ZipWriter};
 
 pub struct HomePage {
-    old_pds_token: String,
-    new_pds_token: String,
-    did: String,
-    new_pds_host: String,
-    old_pds_host: String,
     plc_token: String,
     user_recovery_key: String,
     user_recovery_key_password: String,
     error_tx: Sender<GuiError>,
     success_tx: Sender<String>,
+    session_config: SessionConfig,
     // storage_dir: std::path::Path,
 }
 
@@ -34,89 +31,112 @@ impl HomePage {
         _page_tx: Sender<Page>,
         error_tx: Sender<GuiError>,
         success_tx: Sender<String>,
-        old_pds_token: String,
-        new_pds_token: String,
-        old_pds_host: String,
-        new_pds_host: String,
-        did: String,
+        session_config: SessionConfig,
     ) -> Self {
         Self {
-            old_pds_token,
-            new_pds_token,
-            did,
-            new_pds_host,
-            old_pds_host,
             plc_token: "".to_string(),
             error_tx,
             success_tx,
             user_recovery_key: "".to_string(),
             user_recovery_key_password: "".to_string(),
+            session_config,
         }
     }
 
     pub fn show(&mut self, ui: &mut Ui) {
-        ui.vertical_centered(|ui| {
-            styles::render_button(ui, "Export Repo", || {
-                self.export_repo();
-            });
-            styles::render_button(ui, "Import Repo", || {
-                self.import_repo();
-            });
-            styles::render_button(ui, "Export Blobs", || {
-                self.export_blobs();
-            });
-            styles::render_button(ui, "Upload Blobs", || {
-                self.upload_blobs();
-            });
-            styles::render_button(ui, "Migrate Preferences", || {
-                self.migrate_preferences();
-            });
-            styles::render_button(ui, "Request Token", || {
-                self.request_token();
-            });
-            ui.horizontal(|ui| {
-                styles::render_button(ui, "Generate Recovery Key", || {
-                    self.generate_recovery_key();
-                });
-                styles::render_input(
-                    ui,
-                    "Password",
-                    &mut self.user_recovery_key_password,
-                    true,
-                    Some(""),
-                );
-            });
-
-            ui.horizontal(|ui| {
-                ui.horizontal(|ui| {
-                    ui.vertical(|ui| {
-                        ui.label("PLC Signing Token");
-                        ui.text_edit_singleline(&mut self.plc_token);
-                    });
-                    ui.vertical(|ui| {
-                        ui.label("User Recovery Key (optional)");
-                        ui.text_edit_singleline(&mut self.user_recovery_key);
-                    });
-                });
-            });
-            ui.horizontal(|ui| {
-                styles::render_button(ui, "Migrate with private key", || {
-                    self.generate_recovery_key();
-                });
-            });
-            styles::render_button(ui, "Activate New Account", || {
-                self.activate_account();
-            });
-            styles::render_button(ui, "Deactivate Old Account", || {
-                self.deactivate_account();
-            });
+        styles::render_button(ui, "Export Repo", || {
+            self.export_repo();
         });
+        CollapsingHeader::new("Basic")
+            .default_open(true)
+            .show(ui, |ui| {
+                styles::render_button(ui, "Migrate from your PDS to another PDS", || {
+                    self.export_repo();
+                });
+                styles::render_button(ui, "Backup Repo", || {
+                    self.export_repo();
+                });
+                styles::render_button(ui, "Backup Media", || {
+                    self.export_repo();
+                });
+            });
+        CollapsingHeader::new("Advanced")
+            .default_open(false)
+            .show(ui, |ui| {
+                styles::render_button(ui, "Export Repo", || {
+                    self.export_repo();
+                });
+                styles::render_button(ui, "Import Repo", || {
+                    self.import_repo();
+                });
+                styles::render_button(ui, "Export Blobs", || {
+                    self.export_blobs();
+                });
+                styles::render_button(ui, "Upload Blobs", || {
+                    self.upload_blobs();
+                });
+                styles::render_button(ui, "Migrate Preferences", || {
+                    self.migrate_preferences();
+                });
+                styles::render_button(ui, "Request Token", || {
+                    self.request_token();
+                });
+                ui.horizontal(|ui| {
+                    styles::render_button(ui, "Generate Recovery Key", || {
+                        self.generate_recovery_key();
+                    });
+                    styles::render_input(
+                        ui,
+                        "Password",
+                        &mut self.user_recovery_key_password,
+                        true,
+                        Some(""),
+                    );
+                });
+
+                ui.horizontal(|ui| {
+                    ui.horizontal(|ui| {
+                        ui.vertical(|ui| {
+                            ui.label("PLC Signing Token");
+                            ui.text_edit_singleline(&mut self.plc_token);
+                        });
+                        ui.vertical(|ui| {
+                            ui.label("User Recovery Key (optional)");
+                            ui.text_edit_singleline(&mut self.user_recovery_key);
+                        });
+                    });
+                });
+                ui.horizontal(|ui| {
+                    styles::render_button(ui, "Migrate with private key", || {
+                        self.generate_recovery_key();
+                    });
+                });
+                styles::render_button(ui, "Activate New Account", || {
+                    self.activate_account();
+                });
+                styles::render_button(ui, "Deactivate Old Account", || {
+                    self.deactivate_account();
+                });
+            });
     }
 
     fn export_repo(&mut self) {
-        let did = self.did.clone();
-        let pds_host = self.old_pds_host.clone();
-        let token = self.old_pds_token.clone();
+        let did = match &self.session_config.did {
+            None => {
+                self.error_tx.send(GuiError::Other).unwrap();
+                return;
+            }
+            Some(did) => did.clone(),
+        };
+        let old_session_config = match &self.session_config.old_session_config {
+            None => {
+                self.error_tx.send(GuiError::Other).unwrap();
+                return;
+            }
+            Some(config) => config,
+        };
+        let pds_host = old_session_config.old_pds_host.clone();
+        let token = old_session_config.old_pds_token.clone();
         let error_tx = self.error_tx.clone();
         let success_tx = self.success_tx.clone();
 
@@ -153,9 +173,22 @@ impl HomePage {
     }
 
     fn import_repo(&mut self) {
-        let did = self.did.clone();
-        let pds_host = self.new_pds_host.to_string();
-        let token = self.new_pds_token.clone();
+        let did = match &self.session_config.did {
+            None => {
+                self.error_tx.send(GuiError::Other).unwrap();
+                return;
+            }
+            Some(did) => did.clone(),
+        };
+        let new_session_config = match &self.session_config.new_session_config {
+            None => {
+                self.error_tx.send(GuiError::Other).unwrap();
+                return;
+            }
+            Some(config) => config,
+        };
+        let pds_host = new_session_config.new_pds_host.to_string();
+        let token = new_session_config.new_pds_token.clone();
         let error_tx = self.error_tx.clone();
         let success_tx = self.success_tx.clone();
 
@@ -180,11 +213,31 @@ impl HomePage {
     }
 
     fn export_blobs(&mut self) {
-        let did = self.did.clone();
-        let old_pds_host = self.old_pds_host.clone();
-        let new_pds_host = self.new_pds_host.clone();
-        let old_token = self.old_pds_token.clone();
-        let new_token = self.new_pds_token.clone();
+        let did = match &self.session_config.did {
+            None => {
+                self.error_tx.send(GuiError::Other).unwrap();
+                return;
+            }
+            Some(did) => did.clone(),
+        };
+        let old_session_config = match &self.session_config.old_session_config {
+            None => {
+                self.error_tx.send(GuiError::Other).unwrap();
+                return;
+            }
+            Some(config) => config,
+        };
+        let new_session_config = match &self.session_config.new_session_config {
+            None => {
+                self.error_tx.send(GuiError::Other).unwrap();
+                return;
+            }
+            Some(config) => config,
+        };
+        let old_pds_host = old_session_config.old_pds_host.clone();
+        let new_pds_host = new_session_config.new_pds_host.clone();
+        let old_token = old_session_config.old_pds_token.clone();
+        let new_token = new_session_config.new_pds_token.clone();
         let error_tx = self.error_tx.clone();
         let success_tx = self.success_tx.clone();
 
@@ -218,9 +271,22 @@ impl HomePage {
     }
 
     fn upload_blobs(&mut self) {
-        let did = self.did.clone();
-        let pds_host = self.new_pds_host.clone();
-        let token = self.new_pds_token.clone();
+        let did = match &self.session_config.did {
+            None => {
+                self.error_tx.send(GuiError::Other).unwrap();
+                return;
+            }
+            Some(did) => did.clone(),
+        };
+        let new_session_config = match &self.session_config.new_session_config {
+            None => {
+                self.error_tx.send(GuiError::Other).unwrap();
+                return;
+            }
+            Some(config) => config,
+        };
+        let pds_host = new_session_config.new_pds_host.clone();
+        let token = new_session_config.new_pds_token.clone();
         let error_tx = self.error_tx.clone();
         let success_tx = self.success_tx.clone();
 
@@ -245,11 +311,31 @@ impl HomePage {
     }
 
     fn migrate_plc(&mut self) {
-        let did = self.did.clone();
-        let origin = self.old_pds_host.clone();
-        let destination = self.new_pds_host.clone();
-        let origin_token = self.old_pds_token.clone();
-        let destination_token = self.new_pds_token.clone();
+        let did = match &self.session_config.did {
+            None => {
+                self.error_tx.send(GuiError::Other).unwrap();
+                return;
+            }
+            Some(did) => did.clone(),
+        };
+        let old_session_config = match &self.session_config.old_session_config {
+            None => {
+                self.error_tx.send(GuiError::Other).unwrap();
+                return;
+            }
+            Some(config) => config,
+        };
+        let new_session_config = match &self.session_config.new_session_config {
+            None => {
+                self.error_tx.send(GuiError::Other).unwrap();
+                return;
+            }
+            Some(config) => config,
+        };
+        let origin = old_session_config.old_pds_host.clone();
+        let destination = new_session_config.new_pds_host.clone();
+        let origin_token = old_session_config.old_pds_token.clone();
+        let destination_token = new_session_config.new_pds_token.clone();
         let plc_signing_token = self.plc_token.clone();
         let user_recovery_key = match self.user_recovery_key.is_empty() {
             true => None,
@@ -283,11 +369,31 @@ impl HomePage {
     }
 
     fn migrate_preferences(&mut self) {
-        let did = self.did.clone();
-        let origin = self.old_pds_host.clone();
-        let destination = self.new_pds_host.clone();
-        let origin_token = self.old_pds_token.clone();
-        let destination_token = self.new_pds_token.clone();
+        let did = match &self.session_config.did {
+            None => {
+                self.error_tx.send(GuiError::Other).unwrap();
+                return;
+            }
+            Some(did) => did.clone(),
+        };
+        let old_session_config = match &self.session_config.old_session_config {
+            None => {
+                self.error_tx.send(GuiError::Other).unwrap();
+                return;
+            }
+            Some(config) => config,
+        };
+        let new_session_config = match &self.session_config.new_session_config {
+            None => {
+                self.error_tx.send(GuiError::Other).unwrap();
+                return;
+            }
+            Some(config) => config,
+        };
+        let origin = old_session_config.old_pds_host.clone();
+        let destination = new_session_config.new_pds_host.clone();
+        let origin_token = old_session_config.old_pds_token.clone();
+        let destination_token = new_session_config.new_pds_token.clone();
         let error_tx = self.error_tx.clone();
         let success_tx = self.success_tx.clone();
 
@@ -316,9 +422,22 @@ impl HomePage {
     }
 
     fn request_token(&mut self) {
-        let did = self.did.clone();
-        let pds_host = self.old_pds_host.clone();
-        let token = self.old_pds_token.clone();
+        let did = match &self.session_config.did {
+            None => {
+                self.error_tx.send(GuiError::Other).unwrap();
+                return;
+            }
+            Some(did) => did.clone(),
+        };
+        let old_session_config = match &self.session_config.old_session_config {
+            None => {
+                self.error_tx.send(GuiError::Other).unwrap();
+                return;
+            }
+            Some(config) => config,
+        };
+        let pds_host = old_session_config.old_pds_host.clone();
+        let token = old_session_config.old_pds_token.clone();
         let error_tx = self.error_tx.clone();
         let success_tx = self.success_tx.clone();
 
@@ -388,9 +507,22 @@ impl HomePage {
     }
 
     fn activate_account(&self) {
-        let did = self.did.clone();
-        let pds_host = self.new_pds_host.clone();
-        let token = self.new_pds_token.clone();
+        let did = match &self.session_config.did {
+            None => {
+                self.error_tx.send(GuiError::Other).unwrap();
+                return;
+            }
+            Some(did) => did.clone(),
+        };
+        let new_session_config = match &self.session_config.new_session_config {
+            None => {
+                self.error_tx.send(GuiError::Other).unwrap();
+                return;
+            }
+            Some(config) => config,
+        };
+        let pds_host = new_session_config.new_pds_host.clone();
+        let token = new_session_config.new_pds_token.clone();
         let error_tx = self.error_tx.clone();
         let success_tx = self.success_tx.clone();
 
@@ -417,9 +549,22 @@ impl HomePage {
     }
 
     fn deactivate_account(&self) {
-        let did = self.did.clone();
-        let pds_host = self.old_pds_host.clone();
-        let token = self.old_pds_token.clone();
+        let did = match &self.session_config.did {
+            None => {
+                self.error_tx.send(GuiError::Other).unwrap();
+                return;
+            }
+            Some(did) => did.clone(),
+        };
+        let old_session_config = match &self.session_config.old_session_config {
+            None => {
+                self.error_tx.send(GuiError::Other).unwrap();
+                return;
+            }
+            Some(config) => config,
+        };
+        let pds_host = old_session_config.old_pds_host.clone();
+        let token = old_session_config.old_pds_token.clone();
         let error_tx = self.error_tx.clone();
         let success_tx = self.success_tx.clone();
 

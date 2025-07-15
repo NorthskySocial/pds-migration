@@ -9,15 +9,25 @@ include = [
 
 [dependencies]
 pdsmigration-common = { workspace = true }
-bsky-sdk = "0.1.16"
+bsky-sdk = "0.1.20"
 egui = { version = "0.31.0" }
 eframe = { version = "0.31", features = ["glow", "wgpu"] }
 derive_more = "2.0.1"
-atrium-xrpc = "0.12.1"
+atrium-xrpc = "0.12.3"
 zip = "4.1.0"
 secp256k1 = { version = "0.31.0", features = ["rand"] }
 multibase = "0.9.1"
 unsigned-varint = "0.8.0"
 rand = "0.9.1"
+log = "0.4.26"
+
+# native:
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 env_logger = "0.11.8"
 tokio = { version = "1.43.1", features = ["rt-multi-thread", "time"] }
+
+# web:
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen-futures = "0.4.50"
+web-sys = "0.3.70"              # to access the DOM (to hide the loading text)
+tokio = { version = "1.43.1", features = ["rt", "time"] }
