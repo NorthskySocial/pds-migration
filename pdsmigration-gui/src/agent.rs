@@ -4,7 +4,7 @@ use bsky_sdk::api::agent::atp_agent::AtpSession;
 use bsky_sdk::api::agent::Configure;
 use bsky_sdk::BskyAgent;
 
-pub async fn login_helper(
+pub async fn login_helper2(
     agent: &BskyAgent,
     pds_host: &str,
     username: &str,
