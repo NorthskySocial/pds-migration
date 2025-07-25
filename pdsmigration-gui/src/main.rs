@@ -1,17 +1,31 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use crate::app::PdsMigrationApp;
+use tracing::Level;
+use tracing_subscriber::filter;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 
 mod agent;
 mod app;
+mod error_window;
 mod errors;
 mod session_config;
 mod styles;
+mod success_window;
 
 fn main() -> eframe::Result {
     use std::time::Duration;
     use tokio::runtime::Runtime;
 
-    env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
+    let filter = filter::Targets::new().with_target("pdsmigration", Level::INFO);
+
+    let collector = egui_tracing::EventCollector::default();
+    tracing_subscriber::registry()
+        .with(collector.clone())
+        .with(filter)
+        .init();
+
     let rt = Runtime::new().expect("Unable to create Runtime");
 
     // Enter the runtime so that `tokio::spawn` is available immediately.
@@ -37,7 +51,7 @@ fn main() -> eframe::Result {
         options,
         Box::new(|cc| {
             styles::setup_fonts(&cc.egui_ctx);
-            Ok(Box::<PdsMigrationApp>::default())
+            Ok(Box::new(PdsMigrationApp::new(cc, collector)))
         }),
     )
 }

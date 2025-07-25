@@ -53,18 +53,69 @@ pub async fn login_helper(
 }
 
 #[tracing::instrument(skip(agent))]
-pub async fn describe_server(
-    agent: &BskyAgent,
-) -> Result<bsky_sdk::api::com::atproto::server::describe_server::OutputData, String> {
-    let result = agent.api.com.atproto.server.describe_server().await;
+pub async fn list_all_blobs(agent: &BskyAgent) -> Result<Vec<Cid>, PdsError> {
+    let mut blob_cids = Vec::new();
+    let query_limit = 500;
+    let did = agent.did().await.clone().unwrap();
+    use bsky_sdk::api::com::atproto::sync::list_blobs::{Parameters, ParametersData};
+    let mut cursor = None;
+    let result = agent
+        .api
+        .com
+        .atproto
+        .sync
+        .list_blobs(Parameters {
+            data: ParametersData {
+                cursor: cursor.clone(),
+                did: did.clone(),
+                limit: None,
+                since: None,
+            },
+            extra_data: Ipld::Null,
+        })
+        .await;
     match result {
         Ok(output) => {
             tracing::info!("{:?}", output);
-            Ok(output.data)
+            cursor = output.cursor.clone();
+
+            blob_cids.extend(output.cids.clone());
+            let mut last_count = output.cids.len();
+            while last_count == query_limit {
+                match agent
+                    .api
+                    .com
+                    .atproto
+                    .sync
+                    .list_blobs(Parameters {
+                        data: ParametersData {
+                            cursor: cursor.clone(),
+                            did: did.clone(),
+                            limit: None,
+                            since: None,
+                        },
+                        extra_data: Ipld::Null,
+                    })
+                    .await
+                {
+                    Ok(output2) => {
+                        tracing::info!("{:?}", output2);
+                        cursor = output2.cursor.clone();
+                        last_count = output2.cids.len();
+                        blob_cids.extend(output2.cids.clone());
+                    }
+                    Err(e) => {
+                        tracing::error!("{:?}", e);
+                        return Err(PdsError::Validation);
+                    }
+                }
+            }
+
+            Ok(output.cids.clone())
         }
         Err(e) => {
             tracing::error!("{:?}", e);
-            Err(String::from("Error"))
+            Err(PdsError::Validation)
         }
     }
 }

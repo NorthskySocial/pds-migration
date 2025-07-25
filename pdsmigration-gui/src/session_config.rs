@@ -51,6 +51,7 @@ impl PdsSession {
                 });
             }
             Some(_) => {
+                tracing::error!("Session already exists for another DID");
                 panic!("Session already exists for another DID");
             }
         };
@@ -73,6 +74,7 @@ impl PdsSession {
                 });
             }
             Some(_) => {
+                tracing::error!("Session already exists for another DID");
                 panic!("Session already exists for another DID");
             }
         };

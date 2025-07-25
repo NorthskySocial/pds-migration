@@ -4,6 +4,18 @@ use bsky_sdk::api::agent::atp_agent::AtpSession;
 use bsky_sdk::api::agent::Configure;
 use bsky_sdk::BskyAgent;
 
+pub async fn describe_server(
+    agent: &BskyAgent,
+    pds_host: &str,
+) -> Result<bsky_sdk::api::com::atproto::server::describe_server::OutputData, String> {
+    agent.configure_endpoint(pds_host.to_string());
+    let result = agent.api.com.atproto.server.describe_server().await;
+    match result {
+        Ok(output) => Ok(output.data),
+        Err(e) => Err(String::from("Error")),
+    }
+}
+
 pub async fn login_helper2(
     agent: &BskyAgent,
     pds_host: &str,

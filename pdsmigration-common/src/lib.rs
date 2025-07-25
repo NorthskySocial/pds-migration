@@ -1,7 +1,7 @@
 use crate::agent::{
     account_export, account_import, activate_account, create_account, deactivate_account,
-    export_preferences, get_blob, get_service_auth, import_preferences, login_helper,
-    missing_blobs, recommended_plc, request_token, sign_plc, submit_plc, upload_blob,
+    export_preferences, get_blob, get_service_auth, import_preferences, list_all_blobs,
+    login_helper, missing_blobs, recommended_plc, request_token, sign_plc, submit_plc, upload_blob,
 };
 use crate::errors::PdsError;
 use bsky_sdk::api::agent::Configure;
@@ -218,6 +218,66 @@ pub async fn export_blobs_api(req: ExportBlobsRequest) -> Result<(), PdsError> {
                     missing_blob
                         .record_uri
                         .as_str()
+                        .split("/")
+                        .last()
+                        .unwrap_or("fallback"),
+                );
+                tokio::fs::write(path.as_path(), output)
+                    .await
+                    .map_err(|error| {
+                        tracing::error!("{}", error.to_string());
+                        PdsError::AccountExport
+                    })?;
+            }
+            Err(_) => {
+                tracing::error!("Failed to determine missing blobs");
+                // return Err(PdsError::Validation);
+            }
+        }
+    }
+    Ok(())
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ExportAllBlobsRequest {
+    pub origin: String,
+    pub did: String,
+    pub origin_token: String,
+}
+
+#[tracing::instrument]
+pub async fn export_all_blobs_api(req: ExportAllBlobsRequest) -> Result<(), PdsError> {
+    let agent = BskyAgent::builder().build().await.map_err(|error| {
+        tracing::error!("{}", error.to_string());
+        PdsError::Runtime
+    })?;
+    let session = login_helper(
+        &agent,
+        req.origin.as_str(),
+        req.did.as_str(),
+        req.origin_token.as_str(),
+    )
+    .await?;
+    let blobs = list_all_blobs(&agent).await?;
+    let mut path = std::env::current_dir().unwrap();
+    path.push(session.did.as_str().replace(":", "-"));
+    match tokio::fs::create_dir(path.as_path()).await {
+        Ok(_) => {}
+        Err(e) => {
+            if e.kind() != ErrorKind::AlreadyExists {
+                tracing::error!("Error creating directory: {:?}", e);
+                return Err(PdsError::Validation);
+            }
+        }
+    }
+    for blob in &blobs {
+        match get_blob(&agent, blob.clone(), session.did.clone()).await {
+            Ok(output) => {
+                tracing::info!("Successfully fetched missing blob");
+                let mut path = std::env::current_dir().unwrap();
+                path.push(session.did.as_str().replace(":", "-"));
+                path.push(
+                    Cid::to_string(blob.as_ref())
                         .split("/")
                         .last()
                         .unwrap_or("fallback"),

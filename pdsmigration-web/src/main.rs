@@ -31,7 +31,7 @@ fn init_http_server(server_port: &str, worker_count: &str) -> Server {
             .service(migrate_plc_api)
             .service(get_service_auth_api)
     })
-    .bind(format!("0.0.0.0:{}", server_port))
+    .bind(format!("0.0.0.0:{server_port}"))
     .unwrap()
     .workers(worker_count.parse::<usize>().unwrap_or(2))
     .run()
