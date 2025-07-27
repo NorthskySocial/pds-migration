@@ -1,5 +1,4 @@
 use egui::{RichText, Theme};
-use rand::Rng;
 
 /// Margin to be applied to the main frame of the application.
 pub const FRAME_MARGIN: f32 = 50.0;
@@ -43,7 +42,7 @@ pub fn setup_fonts(ctx: &egui::Context) {
     let mut fonts = egui::FontDefinitions::default();
     fonts.font_data.insert(
         MAIN_FONT_NAME.to_owned(),
-        egui::FontData::from_static(include_bytes!("../assets/Geist-VariableFont_wght.ttf")).into(),
+        egui::FontData::from_static(include_bytes!("../assets/Geist-VariableFont_wght.ttf")),
     );
 
     fonts
@@ -56,7 +55,7 @@ pub fn setup_fonts(ctx: &egui::Context) {
 }
 
 /// Sets the UI text color.
-pub fn set_text_color(ui: &mut egui::Ui) {
+pub fn set_text_color(_ui: &mut egui::Ui) {
     // ui.visuals_mut().override_text_color = Some(FRAME_TEXT_COLOR);
 }
 
@@ -73,19 +72,39 @@ pub fn render_input(
     is_password: bool,
     text_hint: Option<&str>,
 ) {
-    ui.vertical_centered(|ui| {
-        ui.add_space(WIDGET_SPACING_BASE);
-        ui.label(RichText::new(label));
+    ui.add_space(WIDGET_SPACING_BASE);
+    ui.label(RichText::new(label));
 
-        let mut edit_text = egui::TextEdit::singleline(text)
-            .password(is_password)
-            .desired_width(INPUT_WIDTH);
-        if let Some(hint) = text_hint {
-            edit_text = edit_text.hint_text(hint);
-        }
-        ui.add(edit_text);
-        ui.add_space(WIDGET_SPACING_BASE);
-    });
+    let mut edit_text = egui::TextEdit::singleline(text)
+        .password(is_password)
+        .desired_width(INPUT_WIDTH);
+    if let Some(hint) = text_hint {
+        edit_text = edit_text.hint_text(hint);
+    }
+    ui.add(edit_text);
+    ui.add_space(WIDGET_SPACING_BASE);
+}
+
+/// Renders a styled input field with a given label and control text.
+pub fn render_input_disabled(
+    ui: &mut egui::Ui,
+    label: &str,
+    text: &mut String,
+    is_password: bool,
+    text_hint: Option<&str>,
+) {
+    ui.add_space(WIDGET_SPACING_BASE);
+    ui.label(RichText::new(label));
+
+    let mut edit_text = egui::TextEdit::singleline(text)
+        .password(is_password)
+        .desired_width(INPUT_WIDTH)
+        .interactive(false);
+    if let Some(hint) = text_hint {
+        edit_text = edit_text.hint_text(hint);
+    }
+    ui.add(edit_text);
+    ui.add_space(WIDGET_SPACING_BASE);
 }
 
 pub fn render_button(ui: &mut egui::Ui, ctx: &egui::Context, label: &str, callback: impl FnOnce()) {
@@ -110,40 +129,6 @@ pub fn render_button(ui: &mut egui::Ui, ctx: &egui::Context, label: &str, callba
 
 /// Renders a heading-styled label with a specific text and size.
 fn render_heading(ui: &mut egui::Ui, ctx: &egui::Context, text: &str, size: f32) {
-    match ctx.theme() {
-        Theme::Dark => {
-            egui::Frame::default()
-                .inner_margin(egui::vec2(size / 2.0, size / 2.0))
-                .show(ui, |ui| {
-                    ui.vertical_centered(|ui| {
-                        ui.label(
-                            RichText::new(text)
-                                .text_style(egui::TextStyle::Heading)
-                                .size(size)
-                                .strong(),
-                        );
-                    });
-                });
-        }
-        Theme::Light => {
-            egui::Frame::default()
-                .inner_margin(egui::vec2(size / 2.0, size / 2.0))
-                .show(ui, |ui| {
-                    ui.vertical_centered(|ui| {
-                        ui.label(
-                            RichText::new(text)
-                                .text_style(egui::TextStyle::Heading)
-                                .size(size)
-                                .color(FRAME_TEXT_COLOR)
-                                .strong(),
-                        );
-                    });
-                });
-        }
-    }
-}
-
-fn render_collapsing_header(ui: &mut egui::Ui, ctx: &egui::Context, text: &str, size: f32) {
     match ctx.theme() {
         Theme::Dark => {
             egui::Frame::default()

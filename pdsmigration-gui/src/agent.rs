@@ -12,7 +12,7 @@ pub async fn describe_server(
     let result = agent.api.com.atproto.server.describe_server().await;
     match result {
         Ok(output) => Ok(output.data),
-        Err(e) => Err(String::from("Error")),
+        Err(e) => Err(e.to_string()),
     }
 }
 
