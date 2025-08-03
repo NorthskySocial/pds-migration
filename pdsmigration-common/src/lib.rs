@@ -1,13 +1,16 @@
 use crate::agent::{
     account_export, account_import, activate_account, create_account, deactivate_account,
-    export_preferences, get_blob, get_service_auth, import_preferences, list_all_blobs,
-    login_helper, missing_blobs, recommended_plc, request_token, sign_plc, submit_plc, upload_blob,
+    export_preferences, get_blob, get_plc_audit_log, get_recommended, get_service_auth,
+    import_preferences, list_all_blobs, login_helper, missing_blobs, recommended_plc,
+    request_token, sign_plc, submit_plc, upload_blob, PlcOpService, PlcOperation,
 };
 use crate::errors::PdsError;
 use bsky_sdk::api::agent::Configure;
 use bsky_sdk::api::types::string::Did;
 use bsky_sdk::BskyAgent;
 use ipld_core::cid::Cid;
+use multibase::Base::Base58Btc;
+use secp256k1::{PublicKey, Secp256k1};
 use serde::{Deserialize, Serialize};
 use std::io::ErrorKind;
 
@@ -65,6 +68,19 @@ pub struct CreateAccountRequest {
     pub verification_phone: Option<String>,
     pub plc_op: Option<String>,
     pub token: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct CreateAccountWithoutPDSRequest {
+    pub did: Did,
+    pub email: Option<String>,
+    pub handle: String,
+    pub invite_code: Option<String>,
+    pub password: Option<String>,
+    pub recovery_key: Option<String>,
+    pub verification_code: Option<String>,
+    pub verification_phone: Option<String>,
+    pub plc_op: Option<String>,
 }
 
 #[tracing::instrument(skip(req))]
@@ -508,4 +524,27 @@ pub async fn migrate_plc_api(req: MigratePlcRequest) -> Result<(), PdsError> {
     .await?;
     submit_plc(&agent, output).await?;
     Ok(())
+}
+
+pub fn multicodec_wrap(bytes: Vec<u8>) -> Vec<u8> {
+    let mut buf = [0u8; 3];
+    unsigned_varint::encode::u16(0xe7, &mut buf);
+    let mut v: Vec<u8> = Vec::new();
+    for b in &buf {
+        v.push(*b);
+        // varint uses first bit to indicate another byte follows, stop if not the case
+        if *b <= 127 {
+            break;
+        }
+    }
+    v.extend(bytes);
+    v
+}
+
+pub fn public_key_to_did_key(public_key: PublicKey) -> String {
+    let pk_compact = public_key.serialize();
+    let pk_wrapped = multicodec_wrap(pk_compact.to_vec());
+    let pk_multibase = multibase::encode(Base58Btc, pk_wrapped.as_slice());
+    let public_key_str = format!("did:key:{pk_multibase}");
+    public_key_str
 }

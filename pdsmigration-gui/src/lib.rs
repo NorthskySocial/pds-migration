@@ -1,10 +1,14 @@
 use crate::agent::login_helper2;
 use crate::app::PdsMigrationApp;
 use crate::errors::GuiError;
+use crate::ipld::cid_for_cbor;
 use crate::session::session_config::{PdsSession, SessionConfig};
+use base64ct::{Base64, Encoding};
 use bsky_sdk::api::agent::Configure;
 use bsky_sdk::BskyAgent;
+use indexmap::IndexMap;
 use multibase::Base::Base58Btc;
+use pdsmigration_common::agent::PlcOperation;
 use pdsmigration_common::errors::PdsError;
 use pdsmigration_common::{
     ActivateAccountRequest, CreateAccountApiRequest, DeactivateAccountRequest,
@@ -12,9 +16,15 @@ use pdsmigration_common::{
     MigratePlcRequest, MigratePreferencesRequest, RequestTokenRequest, ServiceAuthRequest,
     UploadBlobsRequest,
 };
-use secp256k1::Secp256k1;
+use rand::distr::Alphanumeric;
+use rand::Rng;
+use secp256k1::{Message, PublicKey, Secp256k1, SecretKey};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::io::Write;
 use std::sync::Arc;
+use std::time::SystemTime;
 use tracing::Level;
 use tracing_subscriber::filter;
 use tracing_subscriber::layer::SubscriberExt;
@@ -26,6 +36,7 @@ pub mod agent;
 pub mod app;
 pub mod error_window;
 pub mod errors;
+pub mod ipld;
 pub mod screens;
 pub mod session;
 pub mod styles;
@@ -34,6 +45,7 @@ pub mod success_window;
 #[derive(PartialEq, Clone)]
 pub enum ScreenType {
     Basic,
+    Advanced,
     OldLogin,
     NewLogin,
     AccountCreate,
@@ -47,6 +59,7 @@ pub enum ScreenType {
     CreateNewAccount,
     ExportRepo,
     ImportRepo,
+    MigrateWithoutPds,
 }
 
 #[tracing::instrument(skip(session_config))]
@@ -148,6 +161,58 @@ pub fn generate_recovery_key(user_recovery_key_password: String) -> Result<Strin
         }
     }
     Ok(public_key_str)
+}
+
+#[tracing::instrument]
+pub async fn generate_signing_key() -> (String, String) {
+    let secp = Secp256k1::new();
+    let (secret_key, public_key) = secp.generate_keypair(&mut rand::rng());
+    let pk_compact = public_key.serialize();
+    let pk_wrapped = multicodec_wrap(pk_compact.to_vec());
+    let pk_multibase = multibase::encode(Base58Btc, pk_wrapped.as_slice());
+    let public_key_str = format!("did:key:{pk_multibase}");
+
+    let sk_compact = secret_key.secret_bytes().to_vec();
+    let sk_wrapped = multicodec_wrap(sk_compact.to_vec());
+    let sk_multibase = multibase::encode(Base58Btc, sk_wrapped.as_slice());
+    let secret_key_str = format!("did:key:{sk_multibase}");
+
+    let path = std::path::Path::new("SigningKeypair.zip");
+    let file = match std::fs::File::create(path) {
+        Ok(file) => file,
+        Err(e) => {
+            tracing::error!("Error creating file: {e}");
+            panic!("Error creating file: {e}");
+        }
+    };
+
+    let mut zip = ZipWriter::new(file);
+
+    let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+
+    match zip.start_file("SigningKeypair", options) {
+        Ok(_) => {}
+        Err(e) => {
+            tracing::error!("Error starting file: {e}");
+            panic!("Error starting file: {e}");
+        }
+    }
+    match zip.write_all(secret_key_str.as_bytes()) {
+        Ok(_) => {}
+        Err(e) => {
+            tracing::error!("Error writing file: {e}");
+            panic!("Error writing file: {e}");
+        }
+    }
+
+    match zip.finish() {
+        Ok(_) => {}
+        Err(e) => {
+            tracing::error!("Error finishing file: {e}");
+            panic!("Error finishing file: {e}");
+        }
+    }
+    (public_key_str, secret_key_str)
 }
 
 #[tracing::instrument(skip(session_config))]
@@ -624,6 +689,85 @@ pub async fn create_account(parameters: CreateAccountParameters) -> Result<PdsSe
     }
 }
 
+#[tracing::instrument(skip(parameters))]
+pub async fn gener(parameters: CreateAccountParameters) -> Result<PdsSession, GuiError> {
+    let mut pds_session = parameters.pds_session.clone();
+    let old_session_config = match &pds_session.old_session_config() {
+        None => return Err(GuiError::Other),
+        Some(session_config) => session_config.clone(),
+    };
+    let did = match pds_session.did().clone() {
+        None => return Err(GuiError::Other),
+        Some(did) => did.to_string(),
+    };
+    let email = parameters.new_email.clone();
+    let new_pds_host = parameters.new_pds_host.clone();
+    let aud = new_pds_host.replace("https://", "did:web:");
+
+    let password = parameters.new_password.clone();
+    let invite_code = parameters.invite_code.clone();
+    let handle = parameters.new_handle.clone();
+    tracing::info!("Creating Account started");
+    let service_auth_request = ServiceAuthRequest {
+        pds_host: old_session_config.host().to_string(),
+        aud,
+        did: did.clone(),
+        token: old_session_config.access_token().to_string(),
+    };
+    let service_token = match pdsmigration_common::get_service_auth_api(service_auth_request).await
+    {
+        Ok(res) => res,
+        Err(_pds_error) => return Err(GuiError::Runtime),
+    };
+
+    let create_account_request = CreateAccountApiRequest {
+        email,
+        handle: handle.clone(),
+        invite_code,
+        password: password.clone(),
+        token: service_token,
+        pds_host: new_pds_host.clone(),
+        did,
+        recovery_key: None,
+    };
+    match pdsmigration_common::create_account_api(create_account_request).await {
+        Ok(_) => {
+            tracing::info!("Creating Account completed");
+            let bsky_agent = BskyAgent::builder().build().await.unwrap();
+            match login_helper2(
+                &bsky_agent,
+                new_pds_host.as_str(),
+                handle.as_str(),
+                password.as_str(),
+            )
+            .await
+            {
+                Ok(res) => {
+                    tracing::info!("Login successful");
+                    let access_token = res.access_jwt.clone();
+                    let refresh_token = res.refresh_jwt.clone();
+                    let did = res.did.as_str().to_string();
+                    pds_session.create_new_session(
+                        did.as_str(),
+                        access_token.as_str(),
+                        refresh_token.as_str(),
+                        new_pds_host.as_str(),
+                    );
+                    Ok(pds_session)
+                }
+                Err(e) => {
+                    tracing::error!("Error logging in: {e}");
+                    Err(GuiError::Other)
+                }
+            }
+        }
+        Err(pds_error) => {
+            tracing::error!("Error creating account: {pds_error}");
+            Err(GuiError::Runtime)
+        }
+    }
+}
+
 pub fn run() -> eframe::Result {
     use std::time::Duration;
     use tokio::runtime::Runtime;
@@ -674,4 +818,171 @@ pub fn run() -> eframe::Result {
             Ok(Box::new(PdsMigrationApp::new(cc, collector)))
         }),
     )
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ServiceJwtHeader {
+    pub typ: String,
+    pub alg: String,
+}
+
+pub struct ServiceJwtParams {
+    pub iss: String,
+    pub aud: String,
+    pub exp: Option<u64>,
+    pub lxm: Option<String>,
+    pub jti: Option<String>,
+    pub secret_key: SecretKey,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ServiceJwtPayload {
+    pub iss: String,
+    pub aud: String,
+    pub exp: Option<u64>,
+    pub lxm: Option<String>,
+    pub jti: Option<String>,
+}
+
+pub fn get_random_str() -> String {
+    let token: String = rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(32)
+        .map(char::from)
+        .collect();
+    token
+}
+
+pub fn json_to_b64url<T: Serialize>(obj: &T) -> String {
+    Base64::encode_string((&serde_json::to_string(obj).unwrap()).as_ref()).replace("=", "")
+}
+
+pub async fn create_service_jwt(params: ServiceJwtParams) -> String {
+    let ServiceJwtParams {
+        iss,
+        aud,
+        secret_key,
+        ..
+    } = params;
+    let now = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .expect("timestamp in micros since UNIX epoch")
+        .as_micros() as usize;
+    let exp = params.exp.unwrap_or(((now + 6000 as usize) / 1000) as u64);
+    let lxm = params.lxm;
+    let jti = get_random_str();
+    let header = ServiceJwtHeader {
+        typ: "JWT".to_string(),
+        alg: "ES256K".to_string(),
+    };
+    let payload = ServiceJwtPayload {
+        iss,
+        aud,
+        exp: Some(exp),
+        lxm,
+        jti: Some(jti),
+    };
+    let to_sign_str = format!("{0}.{1}", json_to_b64url(&header), json_to_b64url(&payload));
+    let hash = Sha256::digest(to_sign_str.clone());
+    let message = Message::from_digest_slice(hash.as_ref()).unwrap();
+    let mut sig = secret_key.sign_ecdsa(message);
+    // Convert to low-s
+    sig.normalize_s();
+    // ASN.1 encoded per decode_dss_signature
+    let compact_sig = sig.serialize_compact();
+    format!(
+        "{0}.{1}",
+        to_sign_str,
+        base64_url::encode(&compact_sig).replace("=", "") // Base 64 encode signature bytes
+    )
+}
+
+pub async fn create_update_op<G>(last_op: PlcOperation, signer: &SecretKey, func: G) -> PlcOperation
+where
+    G: Fn(PlcOperation) -> PlcOperation,
+{
+    let last_op_json = serde_json::to_string(&last_op).unwrap();
+    let last_op_index_map: IndexMap<String, Value> = serde_json::from_str(&last_op_json).unwrap();
+    let prev = cid_for_cbor(&last_op_index_map);
+    // omit sig so it doesn't accidentally make its way into the next operation
+    let mut normalized = last_op;
+    normalized.sig = None;
+
+    let mut unsigned = func(normalized);
+    unsigned.prev = Some(prev.to_string());
+
+    add_signature(unsigned, signer).await
+}
+
+pub async fn add_signature(mut obj: PlcOperation, key: &SecretKey) -> PlcOperation {
+    let sig = atproto_sign(&obj, key).to_vec();
+    obj.sig = Some(base64_url::encode(&sig).replace("=", ""));
+    obj
+}
+
+pub fn atproto_sign<T: Serialize>(obj: &T, key: &SecretKey) -> [u8; 64] {
+    // Encode object to json before dag-cbor because serde_ipld_dagcbor doesn't properly
+    // sort by keys
+    let json = serde_json::to_string(obj).unwrap();
+    // Deserialize to IndexMap with preserve key order enabled. serde_ipld_dagcbor does not sort nested
+    // objects properly by keys
+    let map_unsigned: IndexMap<String, Value> = serde_json::from_str(&json).unwrap();
+    let unsigned_bytes = serde_ipld_dagcbor::to_vec(&map_unsigned).unwrap();
+    // Hash dag_cbor to sha256
+    let hash = Sha256::digest(&*unsigned_bytes);
+    // Sign sha256 hash using private key
+    let message = Message::from_digest_slice(hash.as_ref()).unwrap();
+    let mut sig = key.sign_ecdsa(message);
+    // Convert to low-s
+    sig.normalize_s();
+    // ASN.1 encoded per decode_dss_signature
+    let normalized_compact_sig = sig.serialize_compact();
+    normalized_compact_sig
+}
+
+pub fn get_keys_from_private_key_str(private_key: String) -> (SecretKey, PublicKey) {
+    let secp = Secp256k1::new();
+    let decoded_key = hex::decode(private_key.as_bytes()).unwrap();
+    let secret_key = SecretKey::from_slice(&decoded_key).unwrap();
+    let public_key = secret_key.public_key(&secp);
+    (secret_key, public_key)
+}
+
+pub fn decode_did_secret_key(private_key: &str) -> (SecretKey, PublicKey) {
+    let secp = Secp256k1::new();
+    let decoded_key = hex::decode(private_key.as_bytes())
+        .map_err(|error| {
+            let context = format!("Issue decoding hex '{private_key}'");
+            panic!()
+        })
+        .unwrap();
+    let secret_key = SecretKey::from_slice(&decoded_key)
+        .map_err(|error| {
+            let context = format!("Issue creating secret key from input '{private_key}'");
+            panic!()
+        })
+        .unwrap();
+    let public_key = secret_key.public_key(&secp);
+    (secret_key, public_key)
+}
+
+pub fn extract_multikey(did: &String) -> String {
+    if !did.starts_with(DID_KEY_PREFIX) {
+        panic!("Incorrect prefix for did:key: {did}")
+    }
+    did[DID_KEY_PREFIX.len()..].to_string()
+}
+
+pub const DID_KEY_PREFIX: &str = "did:key:";
+
+pub fn encode_did_key(pubkey: &PublicKey) -> String {
+    let pk_compact = pubkey.serialize();
+    let pk_wrapped = multicodec_wrap(pk_compact.to_vec());
+    let pk_multibase = multibase::encode(Base58Btc, pk_wrapped.as_slice());
+    format!("{DID_KEY_PREFIX}{pk_multibase}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
 }

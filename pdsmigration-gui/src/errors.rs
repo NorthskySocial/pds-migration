@@ -1,17 +1,30 @@
-use derive_more::{Display, Error};
+use std::fmt::Display;
 
-#[derive(Debug, Display, Error, Clone)]
+#[derive(Debug, Clone)]
 pub enum GuiError {
-    #[display("No Missing Blobs")]
     NoMissingBlobs,
-    #[display("Invalid PDS Endpoint")]
     InvalidPdsEndpoint,
-    #[display("Invalid Username/Password")]
     InvalidLogin,
-    #[display("Runtime Exception")]
     Runtime,
-    #[display("Other Exception")]
     Other,
-    #[display("Success")]
     Success,
+    Custom(String),
+}
+
+impl Display for GuiError {
+    fn fmt(&self, __derive_more_f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::NoMissingBlobs => __derive_more_f.write_fmt(format_args!("No Missing Blobs",)),
+            Self::InvalidPdsEndpoint => {
+                __derive_more_f.write_fmt(format_args!("Invalid PDS Endpoint",))
+            }
+            Self::InvalidLogin => {
+                __derive_more_f.write_fmt(format_args!("Invalid Username/Password",))
+            }
+            Self::Runtime => __derive_more_f.write_fmt(format_args!("Runtime Exception",)),
+            Self::Other => __derive_more_f.write_fmt(format_args!("Other Exception",)),
+            Self::Success => __derive_more_f.write_fmt(format_args!("Success",)),
+            Self::Custom(_0) => __derive_more_f.write_fmt(format_args!("{_0}",)),
+        }
+    }
 }

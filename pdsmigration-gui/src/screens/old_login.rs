@@ -79,7 +79,18 @@ impl OldLogin {
             };
         });
     }
+
+    #[tracing::instrument(skip(self))]
+    fn start_offline_mode(&mut self) {
+        let page_lock = self.page.clone();
+        tokio::spawn(async move {
+            let mut page = page_lock.write().await;
+            *page = ScreenType::Basic;
+            drop(page)
+        });
+    }
 }
+
 impl Screen for OldLogin {
     fn ui(&mut self, ui: &mut Ui, ctx: &egui::Context) {
         styles::render_subtitle(ui, ctx, "Current PDS Login");
@@ -102,6 +113,10 @@ impl Screen for OldLogin {
             ui.add_space(WIDGET_SPACING_BASE);
             styles::render_button(ui, ctx, "Submit", || {
                 self.old_session_login();
+            });
+            ui.add_space(WIDGET_SPACING_BASE);
+            styles::render_button(ui, ctx, "Start in Offline Mode", || {
+                self.start_offline_mode();
             });
         });
     }

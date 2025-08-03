@@ -29,6 +29,26 @@ impl PdsMigrationApp {
     }
 
     // Helper function to create consistent navigation buttons
+    fn logout(&mut self, ui: &mut Ui, ctx: &egui::Context, text: &str) {
+        let pds_session = self.pds_session.clone();
+        let theme = ctx.theme();
+
+        let button = egui::Button::new(RichText::new(text).size(16.0).color(match theme {
+            Theme::Dark => Color32::LIGHT_GRAY,
+            Theme::Light => Color32::DARK_GRAY,
+        }))
+        .fill(match theme {
+            Theme::Dark => Color32::TRANSPARENT,
+            Theme::Light => Color32::TRANSPARENT,
+        });
+
+        if ui.add_sized([ui.available_width(), 40.0], button).clicked() {
+            let mut pds_session = pds_session.blocking_write();
+            pds_session.clear();
+        }
+    }
+
+    // Helper function to create consistent navigation buttons
     fn show_nav_button(&mut self, ui: &mut Ui, ctx: &egui::Context, text: &str, _page: ScreenType) {
         let page_lock = self.page.clone();
         let page = page_lock.blocking_read().clone();
@@ -69,44 +89,46 @@ impl PdsMigrationApp {
     fn show_side_panel(&mut self, ctx: &egui::Context) {
         let lock = self.pds_session.clone();
         let pds_session = lock.blocking_read().clone();
-        let is_active_session = pds_session.did().is_some();
+        let is_active_session = pds_session.old_session_config().is_some();
 
         // Left side panel for navigation buttons (arranged top-down)
-        if is_active_session {
-            egui::SidePanel::left("side_panel")
-                .default_width(100.0)
-                .show(ctx, |ui| {
-                    ui.add_space(20.0);
-                    ui.vertical_centered_justified(|ui| {
-                        self.show_nav_button(ui, ctx, "Basic", ScreenType::Basic);
-                        // ui.add_space(10.0);
-                        // self.show_nav_button(ui, ctx, "Advanced (WIP)", ScreenType::Advanced);
-                    });
-
-                    // Push a spacer at the bottom to demonstrate vertical spacing
-                    ui.with_layout(Layout::bottom_up(Align::Center), |ui| {
-                        ui.horizontal(|ui| {
-                            ui.label("v1.0.0");
-                            ui.add_space(10.0);
-                        });
-                        ui.horizontal(|ui| {
-                            if ui.button("Light Mode").clicked() {
-                                ctx.set_theme(Theme::Light);
-                            }
-                            ui.add_space(10.0);
-                            if ui.button("Dark Mode").clicked() {
-                                ctx.set_theme(Theme::Dark);
-                            }
-                        });
-                        ui.add(
-                            egui::Image::new(egui::include_image!(
-                                "../assets/Northsky-Icon_Color.png"
-                            ))
-                            .shrink_to_fit(),
-                        )
-                    });
+        egui::SidePanel::left("side_panel")
+            .default_width(100.0)
+            .show(ctx, |ui| {
+                ui.add_space(20.0);
+                ui.vertical_centered_justified(|ui| {
+                    self.show_nav_button(ui, ctx, "Basic", ScreenType::Basic);
+                    ui.add_space(10.0);
+                    self.show_nav_button(ui, ctx, "Advanced", ScreenType::Advanced);
+                    ui.add_space(10.0);
+                    if is_active_session {
+                        self.logout(ui, ctx, "Logout");
+                    } else {
+                        self.show_nav_button(ui, ctx, "Login", ScreenType::OldLogin);
+                    }
                 });
-        }
+
+                // Push a spacer at the bottom to demonstrate vertical spacing
+                ui.with_layout(Layout::bottom_up(Align::Center), |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("v1.0.0");
+                        ui.add_space(10.0);
+                    });
+                    ui.horizontal(|ui| {
+                        if ui.button("Light Mode").clicked() {
+                            ctx.set_theme(Theme::Light);
+                        }
+                        ui.add_space(10.0);
+                        if ui.button("Dark Mode").clicked() {
+                            ctx.set_theme(Theme::Dark);
+                        }
+                    });
+                    ui.add(
+                        egui::Image::new(egui::include_image!("../assets/Northsky-Icon_Color.png"))
+                            .shrink_to_fit(),
+                    )
+                });
+            });
     }
 
     fn show_bottom_panel(&mut self, ctx: &egui::Context) {
@@ -212,6 +234,17 @@ impl PdsMigrationApp {
                 self.error.clone(),
                 self.page.clone(),
             )),
+            ScreenType::Advanced => Box::new(screens::advanced_home::AdvancedHome::new(
+                self.pds_session.clone(),
+                self.error.clone(),
+                self.page.clone(),
+            )),
+            ScreenType::MigrateWithoutPds => {
+                Box::new(screens::migrate_without_pds::MigrateWithoutPds::new(
+                    self.error.clone(),
+                    self.page.clone(),
+                ))
+            }
         };
 
         // Reassign the current_screen

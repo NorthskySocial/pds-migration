@@ -28,9 +28,8 @@ impl BasicHome {
             pds_migration_step,
         }
     }
-}
-impl Screen for BasicHome {
-    fn ui(&mut self, ui: &mut Ui, ctx: &egui::Context) {
+
+    pub fn show_logged_in(&self, ui: &mut Ui, ctx: &egui::Context) {
         ScrollArea::both().show(ui, |ui| {
             styles::render_button(ui, ctx, "Migrate from your PDS to another PDS", || {
                 let pds_migration_step = self.pds_migration_step.clone();
@@ -40,6 +39,16 @@ impl Screen for BasicHome {
                     *pds_migration_step = true;
                     let mut page = page_lock.write().await;
                     *page = ScreenType::DoesAccountExist;
+                });
+            });
+            styles::render_button(ui, ctx, "Migrate to PDS without a PDS", || {
+                let pds_migration_step = self.pds_migration_step.clone();
+                let page_lock = self.page.clone();
+                tokio::spawn(async move {
+                    let mut pds_migration_step = pds_migration_step.write().await;
+                    *pds_migration_step = true;
+                    let mut page = page_lock.write().await;
+                    *page = ScreenType::MigrateWithoutPds;
                 });
             });
             styles::render_button(ui, ctx, "Backup Repo", || {
@@ -76,6 +85,34 @@ impl Screen for BasicHome {
                     }
                 });
             });
+        });
+    }
+
+    pub fn show_logged_out(&self, ui: &mut Ui, ctx: &egui::Context) {
+        ScrollArea::both().show(ui, |ui| {
+            styles::render_button(ui, ctx, "Migrate to PDS without a PDS", || {
+                let pds_migration_step = self.pds_migration_step.clone();
+                let page_lock = self.page.clone();
+                tokio::spawn(async move {
+                    let mut pds_migration_step = pds_migration_step.write().await;
+                    *pds_migration_step = true;
+                    let mut page = page_lock.write().await;
+                    *page = ScreenType::MigrateWithoutPds;
+                });
+            });
+        });
+    }
+}
+
+impl Screen for BasicHome {
+    fn ui(&mut self, ui: &mut Ui, ctx: &egui::Context) {
+        ScrollArea::both().show(ui, |ui| {
+            let pds_session = { self.pds_session.blocking_read().clone() };
+            if pds_session.old_session_config().is_some() {
+                self.show_logged_in(ui, ctx);
+            } else {
+                self.show_logged_out(ui, ctx);
+            }
         });
     }
 

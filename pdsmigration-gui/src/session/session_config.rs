@@ -39,6 +39,12 @@ impl PdsSession {
         }
     }
 
+    pub fn clear(&mut self) {
+        self.did = None;
+        self.old_session_config = None;
+        self.new_session_config = None;
+    }
+
     pub fn create_old_session(
         &mut self,
         did: &str,

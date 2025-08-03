@@ -1,5 +1,5 @@
 use crate::errors::PdsError;
-use crate::CreateAccountRequest;
+use crate::{CreateAccountRequest, CreateAccountWithoutPDSRequest};
 use bsky_sdk::api::agent::atp_agent::AtpSession;
 use bsky_sdk::api::agent::Configure;
 use bsky_sdk::api::app::bsky::actor::defs::Preferences;
@@ -9,7 +9,10 @@ use bsky_sdk::api::types::string::{Cid, Did, Handle, Nsid};
 use bsky_sdk::api::types::Unknown;
 use bsky_sdk::BskyAgent;
 use ipld_core::ipld::Ipld;
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
+const PLC_DIRECTORY: &str = "https://plc.directory";
 pub type GetAgentResult = Result<BskyAgent, Box<dyn std::error::Error>>;
 pub type RecommendedDidOutputData =
     bsky_sdk::api::com::atproto::identity::get_recommended_did_credentials::OutputData;
@@ -54,98 +57,79 @@ pub async fn login_helper(
 
 #[tracing::instrument(skip(agent))]
 pub async fn list_all_blobs(agent: &BskyAgent) -> Result<Vec<Cid>, PdsError> {
-    let mut blob_cids = Vec::new();
-    let query_limit = 500;
-    let did = agent.did().await.clone().unwrap();
     use bsky_sdk::api::com::atproto::sync::list_blobs::{Parameters, ParametersData};
+    let mut result = vec![];
     let mut cursor = None;
-    let result = agent
-        .api
-        .com
-        .atproto
-        .sync
-        .list_blobs(Parameters {
-            data: ParametersData {
-                cursor: cursor.clone(),
-                did: did.clone(),
-                limit: None,
-                since: None,
-            },
-            extra_data: Ipld::Null,
-        })
-        .await;
-    match result {
-        Ok(output) => {
-            tracing::info!("{:?}", output);
-            cursor = output.cursor.clone();
-
-            blob_cids.extend(output.cids.clone());
-            let mut last_count = output.cids.len();
-            while last_count == query_limit {
-                match agent
-                    .api
-                    .com
-                    .atproto
-                    .sync
-                    .list_blobs(Parameters {
-                        data: ParametersData {
-                            cursor: cursor.clone(),
-                            did: did.clone(),
-                            limit: None,
-                            since: None,
-                        },
-                        extra_data: Ipld::Null,
-                    })
-                    .await
-                {
-                    Ok(output2) => {
-                        tracing::info!("{:?}", output2);
-                        cursor = output2.cursor.clone();
-                        last_count = output2.cids.len();
-                        blob_cids.extend(output2.cids.clone());
-                    }
-                    Err(e) => {
-                        tracing::error!("{:?}", e);
-                        return Err(PdsError::Validation);
-                    }
-                }
+    let mut length = None;
+    let did = agent.did().await.clone().unwrap();
+    while length.is_none() || length.unwrap() >= 500 {
+        let output = agent
+            .api
+            .com
+            .atproto
+            .sync
+            .list_blobs(Parameters {
+                data: ParametersData {
+                    cursor: cursor.clone(),
+                    did: did.clone(),
+                    limit: None,
+                    since: None,
+                },
+                extra_data: Ipld::Null,
+            })
+            .await;
+        match output {
+            Ok(output) => {
+                tracing::info!("{:?}", output);
+                cursor = output.cursor.clone();
+                length = Some(output.cids.len());
+                let mut blob_cids = output.cids.clone();
+                result.append(blob_cids.as_mut());
             }
-
-            Ok(output.cids.clone())
-        }
-        Err(e) => {
-            tracing::error!("{:?}", e);
-            Err(PdsError::Validation)
+            Err(e) => {
+                tracing::error!("{:?}", e);
+                return Err(PdsError::Validation);
+            }
         }
     }
+    Ok(result)
 }
 
 #[tracing::instrument(skip(agent))]
 pub async fn missing_blobs(agent: &BskyAgent) -> Result<Vec<RecordBlob>, PdsError> {
     use bsky_sdk::api::com::atproto::repo::list_missing_blobs::{Parameters, ParametersData};
-    let result = agent
-        .api
-        .com
-        .atproto
-        .repo
-        .list_missing_blobs(Parameters {
-            data: ParametersData {
-                cursor: None,
-                limit: None,
-            },
-            extra_data: Ipld::Null,
-        })
-        .await;
-    match result {
-        Ok(output) => {
-            tracing::info!("{:?}", output);
-            Ok(output.blobs.clone())
-        }
-        Err(e) => {
-            tracing::error!("{:?}", e);
-            Err(PdsError::Validation)
+    let mut result: Vec<RecordBlob> = vec![];
+    let mut length = None;
+    let mut cursor = None;
+    while length.is_none() || length.unwrap() >= 500 {
+        let output = agent
+            .api
+            .com
+            .atproto
+            .repo
+            .list_missing_blobs(Parameters {
+                data: ParametersData {
+                    cursor: cursor.clone(),
+                    limit: None,
+                },
+                extra_data: Ipld::Null,
+            })
+            .await;
+        match output {
+            Ok(output) => {
+                tracing::info!("{:?}", output);
+                length = Some(output.blobs.len());
+                let mut temp = output.blobs.clone();
+                result.append(temp.as_mut());
+                cursor = output.cursor.clone();
+            }
+            Err(e) => {
+                tracing::error!("{:?}", e);
+                return Err(PdsError::Validation);
+            }
         }
     }
+    Ok(result)
 }
 
 #[tracing::instrument(skip(agent))]
@@ -514,4 +498,168 @@ pub async fn create_account(
         }
     }
     Ok(())
+}
+
+#[tracing::instrument(skip(account_request))]
+pub async fn create_account_without_pds(
+    pds_host: &str,
+    account_request: &CreateAccountWithoutPDSRequest,
+) -> Result<(), PdsError> {
+    use bsky_sdk::api::com::atproto::server::create_account::{Input, InputData};
+    let client = reqwest::Client::new();
+    let x = serde_json::to_string(&Input {
+        data: InputData {
+            did: Some(account_request.did.clone()),
+            email: account_request.email.clone(),
+            handle: account_request.handle.parse().unwrap(),
+            invite_code: account_request.invite_code.clone(),
+            password: account_request.password.clone(),
+            plc_op: None,
+            recovery_key: account_request.recovery_key.clone(),
+            verification_code: account_request.verification_code.clone(),
+            verification_phone: account_request.verification_phone.clone(),
+        },
+        extra_data: Ipld::Null,
+    })
+    .unwrap();
+    let result = client
+        .post(pds_host.to_string() + "/xrpc/com.atproto.server.createAccount")
+        .body(x)
+        .header("Content-Type", "application/json")
+        .send()
+        .await;
+    match result {
+        Ok(output) => match output.status() {
+            reqwest::StatusCode::OK => {
+                tracing::info!("Successfully created account");
+            }
+            _ => {
+                tracing::error!("Error creating account: {:?}", output);
+                tracing::error!("More: {:?}", output.text().await);
+                return Err(PdsError::Validation);
+            }
+        },
+        Err(e) => {
+            tracing::error!("Error creating account: {:?}", e);
+            return Err(PdsError::Validation);
+        }
+    }
+    Ok(())
+}
+
+pub type PlcLogAudit = Vec<PlcLogAuditEntry>;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlcLogAuditEntry {
+    pub did: String,
+    pub operation: PlcOperation,
+    pub cid: String,
+    pub nullified: bool,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlcOperation {
+    #[serde(rename = "type")]
+    pub r#type: String,
+    #[serde(rename = "rotationKeys")]
+    pub rotation_keys: Vec<String>,
+    #[serde(rename = "verificationMethods")]
+    pub verification_methods: BTreeMap<String, String>,
+    #[serde(rename = "alsoKnownAs")]
+    pub also_known_as: Vec<String>,
+    pub services: BTreeMap<String, PlcOpService>,
+    pub prev: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sig: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlcOpService {
+    #[serde(rename = "type")]
+    pub r#type: String,
+    pub endpoint: String,
+}
+
+#[tracing::instrument]
+pub async fn get_plc_audit_log(did: &str) -> PlcLogAudit {
+    let client = reqwest::Client::new();
+    let plc_audit = match client
+        .get(PLC_DIRECTORY.to_string() + format!("/{did}/log/audit").as_str())
+        .send()
+        .await
+    {
+        Ok(result) => match result.json::<PlcLogAudit>().await {
+            Ok(res) => res,
+            Err(e) => {
+                panic!("Error: Could not parse response {e}");
+            }
+        },
+        Err(e) => {
+            panic!("Error: {e:?}");
+        }
+    };
+    plc_audit
+}
+
+pub async fn generate_service_auth_without_pds() {}
+
+#[tracing::instrument]
+pub async fn send_plc_operation(did: &str, op: PlcOperation) {
+    let client = reqwest::Client::new();
+    match client
+        .post(PLC_DIRECTORY.to_string() + format!("/{did}").as_str())
+        .header("Content-Type", "application/json")
+        .json(&op)
+        .send()
+        .await
+    {
+        Ok(result) => {
+            println!("{result:?}");
+            println!("{:?}", result.status());
+            println!("{:?}", result.text().await);
+            // println!("{:?}", result.json());
+        }
+        Err(e) => {
+            panic!("Error: {e:?}");
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetRecommendedResponse {
+    #[serde(rename = "rotationKeys")]
+    pub rotation_keys: Vec<String>,
+    #[serde(rename = "alsoKnownAs")]
+    pub also_known_as: Vec<String>,
+    pub services: BTreeMap<String, PlcOpService>,
+    #[serde(rename = "verificationMethods")]
+    pub verification_methods: BTreeMap<String, String>,
+}
+
+#[tracing::instrument(skip(access_token))]
+pub async fn get_recommended(pds_host: &str, access_token: &str) -> GetRecommendedResponse {
+    let client = reqwest::Client::new();
+    let result = client
+        .get(pds_host.to_string() + "/xrpc/com.atproto.identity.getRecommendedDidCredentials")
+        .bearer_auth(access_token)
+        .send()
+        .await;
+    match result {
+        Ok(output) => match output.status() {
+            reqwest::StatusCode::OK => {
+                tracing::info!("Successfully Fetched Recommended account");
+                output.json::<GetRecommendedResponse>().await.unwrap()
+            }
+            _ => {
+                tracing::error!("Error fetching recommended account: {:?}", output);
+                panic!("Error: {:?}", output.text().await);
+            }
+        },
+        Err(e) => {
+            tracing::error!("Error fetching recommended: {:?}", e);
+            panic!("Error: {e:?}");
+        }
+    }
 }
