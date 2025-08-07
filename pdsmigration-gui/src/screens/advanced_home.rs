@@ -1,7 +1,7 @@
 use crate::errors::GuiError;
 use crate::screens::Screen;
 use crate::session::session_config::PdsSession;
-use crate::{export_repo, styles, ScreenType};
+use crate::{export_repo, migrate_preferences, styles, ScreenType};
 use egui::{ScrollArea, Ui};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -45,6 +45,14 @@ impl Screen for AdvancedHome {
                             error.push(e);
                         }
                     }
+                });
+            });
+            styles::render_button(ui, ctx, "Edit PLC", || {
+                let page = self.page.clone();
+                tokio::spawn(async move {
+                    tracing::info!("Editing PLC");
+                    let mut page_write = page.write().await;
+                    *page_write = ScreenType::EditPLC;
                 });
             });
         });

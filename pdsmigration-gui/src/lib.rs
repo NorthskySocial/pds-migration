@@ -25,7 +25,7 @@ use sha2::{Digest, Sha256};
 use std::io::Write;
 use std::sync::Arc;
 use std::time::SystemTime;
-use tracing::Level;
+use tracing::{log, Level};
 use tracing_subscriber::filter;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -60,6 +60,7 @@ pub enum ScreenType {
     ExportRepo,
     ImportRepo,
     MigrateWithoutPds,
+    EditPLC,
 }
 
 #[tracing::instrument(skip(session_config))]
@@ -980,9 +981,4 @@ pub fn encode_did_key(pubkey: &PublicKey) -> String {
     let pk_wrapped = multicodec_wrap(pk_compact.to_vec());
     let pk_multibase = multibase::encode(Base58Btc, pk_wrapped.as_slice());
     format!("{DID_KEY_PREFIX}{pk_multibase}")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
 }
