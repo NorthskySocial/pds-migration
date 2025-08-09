@@ -9,6 +9,7 @@ pub enum GuiError {
     Other,
     Success,
     Custom(String),
+    AuthFactorTokenRequired,
 }
 
 impl Display for GuiError {
@@ -25,6 +26,9 @@ impl Display for GuiError {
             Self::Other => __derive_more_f.write_fmt(format_args!("Other Exception",)),
             Self::Success => __derive_more_f.write_fmt(format_args!("Success",)),
             Self::Custom(_0) => __derive_more_f.write_fmt(format_args!("{_0}",)),
+            Self::AuthFactorTokenRequired => {
+                __derive_more_f.write_fmt(format_args!("Auth Factor Token Required",))
+            }
         }
     }
 }

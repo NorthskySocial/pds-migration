@@ -100,6 +100,7 @@ impl CreateAccount {
         let pds_session_lock = self.pds_session.clone();
         let page = self.page.clone();
         let pds_migration_step = self.pds_migration_step.clone();
+
         tokio::spawn(async move {
             match create_account(params).await {
                 Ok(pds_session) => {
@@ -174,7 +175,7 @@ impl Screen for CreateAccount {
                     Some("user.northsky.social"),
                 );
                 ui.label(format!(
-                    "Your full username will be @{handle}{available_user_domains}"
+                    "If not using a custom domain, please append with {available_user_domains}"
                 ));
                 styles::render_input(ui, "Password", &mut self.new_password, true, None);
                 styles::render_input(

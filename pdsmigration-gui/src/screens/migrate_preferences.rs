@@ -28,6 +28,7 @@ impl MigratePreferences {
         }
     }
 }
+
 impl Screen for MigratePreferences {
     fn ui(&mut self, ui: &mut Ui, ctx: &egui::Context) {
         styles::render_subtitle(ui, ctx, "Migrating preferences");
