@@ -6,6 +6,7 @@ use crate::session::session_config::{PdsSession, SessionConfig};
 use base64ct::{Base64, Encoding};
 use bsky_sdk::api::agent::Configure;
 use bsky_sdk::BskyAgent;
+use hex::ToHex;
 use indexmap::IndexMap;
 use multibase::Base::Base58Btc;
 use pdsmigration_common::agent::PlcOperation;
@@ -25,7 +26,7 @@ use sha2::{Digest, Sha256};
 use std::io::Write;
 use std::sync::Arc;
 use std::time::SystemTime;
-use tracing::{log, Level};
+use tracing::Level;
 use tracing_subscriber::filter;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -121,6 +122,7 @@ pub fn generate_recovery_key(user_recovery_key_password: String) -> Result<Strin
     let public_key_str = format!("did:key:{pk_multibase}");
 
     let sk_compact = secret_key.secret_bytes().to_vec();
+    let sk_str = secret_key.secret_bytes().encode_hex::<String>();
     let sk_wrapped = multicodec_wrap(sk_compact.to_vec());
     let sk_multibase = multibase::encode(Base58Btc, sk_wrapped.as_slice());
     let secret_key_str = format!("did:key:{sk_multibase}");
@@ -146,7 +148,7 @@ pub fn generate_recovery_key(user_recovery_key_password: String) -> Result<Strin
             return Err(GuiError::Runtime);
         }
     }
-    match zip.write_all(secret_key_str.as_bytes()) {
+    match zip.write_all(sk_str.as_bytes()) {
         Ok(_) => {}
         Err(e) => {
             tracing::error!("Error writing file: {e}");
@@ -569,6 +571,7 @@ pub struct DescribePDS {
     pub terms_of_service: Option<String>,
     pub privacy_policy: Option<String>,
     pub invite_code_required: bool,
+    pub available_user_domains: Vec<String>,
 }
 
 #[tracing::instrument]
@@ -585,11 +588,13 @@ pub async fn fetch_tos_and_privacy_policy(new_pds_host: String) -> Result<Descri
                 terms_of_service: None,
                 privacy_policy: None,
                 invite_code_required: result.invite_code_required.unwrap_or(false),
+                available_user_domains: result.available_user_domains.clone(),
             }),
             Some(links) => Ok(DescribePDS {
                 terms_of_service: links.terms_of_service.clone(),
                 privacy_policy: links.privacy_policy.clone(),
                 invite_code_required: result.invite_code_required.unwrap_or(false),
+                available_user_domains: result.available_user_domains.clone(),
             }),
         },
         Err(error) => {

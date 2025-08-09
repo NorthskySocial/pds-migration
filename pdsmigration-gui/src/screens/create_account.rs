@@ -20,6 +20,7 @@ pub struct CreateAccount {
     privacy_policy_lock: Arc<RwLock<Option<String>>>,
     terms_of_service_lock: Arc<RwLock<Option<String>>>,
     invite_code_required: Arc<RwLock<bool>>,
+    available_user_domains: Arc<RwLock<Vec<String>>>,
     page: Arc<RwLock<ScreenType>>,
     pds_migration_step: Arc<RwLock<bool>>,
 }
@@ -43,6 +44,7 @@ impl CreateAccount {
             privacy_policy_lock: Arc::new(Default::default()),
             terms_of_service_lock: Arc::new(Default::default()),
             invite_code_required: Arc::new(Default::default()),
+            available_user_domains: Arc::new(Default::default()),
             page,
             pds_migration_step,
         }
@@ -53,6 +55,7 @@ impl CreateAccount {
         let terms_of_service_lock = self.terms_of_service_lock.clone();
         let privacy_policy_lock = self.privacy_policy_lock.clone();
         let invite_code_required = self.invite_code_required.clone();
+        let available_user_domains = self.available_user_domains.clone();
         let new_pds_host = self.new_pds_host.clone();
         tokio::spawn(async move {
             match fetch_tos_and_privacy_policy(new_pds_host).await {
@@ -63,6 +66,8 @@ impl CreateAccount {
                     *terms_of_service_lock = result.terms_of_service;
                     let mut invite_code_required_write = invite_code_required.write().await;
                     *invite_code_required_write = result.invite_code_required;
+                    let mut available_user_domains_write = available_user_domains.write().await;
+                    *available_user_domains_write = result.available_user_domains;
                 }
                 Err(e) => {
                     let mut errors = error.write().await;
@@ -125,6 +130,14 @@ impl CreateAccount {
 
 impl Screen for CreateAccount {
     fn ui(&mut self, ui: &mut Ui, ctx: &egui::Context) {
+        let handle = self.new_handle.clone();
+        let available_user_domains = {
+            let available_user_domains = self.available_user_domains.blocking_read();
+            available_user_domains
+                .get(0)
+                .cloned()
+                .unwrap_or("".to_string())
+        };
         styles::render_subtitle(ui, ctx, "Create New PDS Account!");
         ui.vertical_centered(|ui| {
             ui.horizontal(|ui| {
@@ -160,6 +173,9 @@ impl Screen for CreateAccount {
                     false,
                     Some("user.northsky.social"),
                 );
+                ui.label(format!(
+                    "Your full username will be @{handle}{available_user_domains}"
+                ));
                 styles::render_input(ui, "Password", &mut self.new_password, true, None);
                 styles::render_input(
                     ui,
