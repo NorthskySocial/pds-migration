@@ -12,6 +12,7 @@ pub struct CreateAccount {
     new_pds_host: String,
     new_handle: String,
     new_password: String,
+    confirm_password: String,
     pds_session: Arc<RwLock<PdsSession>>,
     error: Arc<RwLock<Vec<GuiError>>>,
     pds_selected: bool,
@@ -36,6 +37,7 @@ impl CreateAccount {
             new_pds_host: "".to_string(),
             new_handle: "".to_string(),
             new_password: "".to_string(),
+            confirm_password: "".to_string(),
             pds_session,
             error,
             pds_selected: false,
@@ -178,6 +180,7 @@ impl Screen for CreateAccount {
                     "If not using a custom domain, please append with {available_user_domains}"
                 ));
                 styles::render_input(ui, "Password", &mut self.new_password, true, None);
+                styles::render_input(ui, "Password", &mut self.confirm_password, true, None);
                 styles::render_input(
                     ui,
                     "Invite Code (Leave Blank if None)",
