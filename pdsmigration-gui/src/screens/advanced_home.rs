@@ -1,9 +1,16 @@
 use crate::errors::GuiError;
 use crate::screens::Screen;
 use crate::session::session_config::PdsSession;
-use crate::{export_repo, migrate_preferences, styles, ScreenType};
+use crate::{
+    activate_account, deactivate_account, export_repo, migrate_preferences, styles, ScreenType,
+};
+use bsky_sdk::BskyAgent;
 use egui::{ScrollArea, Ui};
+use pdsmigration_common::agent::{login_helper, missing_blobs};
+use pdsmigration_common::errors::PdsError;
 use std::sync::Arc;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 use tokio::sync::RwLock;
 
 #[derive(Clone)]
@@ -43,6 +50,113 @@ impl Screen for AdvancedHome {
                         Err(e) => {
                             let mut error = error.write().await;
                             error.push(e);
+                        }
+                    }
+                });
+            });
+            styles::render_button(ui, ctx, "Activate Account", || {
+                let pds_session = {
+                    let pds_session_lock = self.pds_session.clone();
+                    let value = pds_session_lock.blocking_read();
+                    value.clone()
+                };
+                let error = self.error.clone();
+                let new_session_config = match pds_session.old_session_config() {
+                    None => {
+                        let mut error_write = error.blocking_write();
+                        error_write.push(GuiError::Other);
+                        return;
+                    }
+                    Some(config) => config.clone(),
+                };
+                tokio::spawn(async move {
+                    tracing::info!("Activating Account");
+                    match activate_account(new_session_config).await {
+                        Ok(_) => {
+                            tracing::info!("Activated new account");
+                        }
+                        Err(e) => {
+                            let mut error_write = error.write().await;
+                            error_write.push(GuiError::from(e));
+                        }
+                    }
+                });
+            });
+            styles::render_button(ui, ctx, "Deactivate Account", || {
+                let pds_session = {
+                    let pds_session_lock = self.pds_session.clone();
+                    let value = pds_session_lock.blocking_read();
+                    value.clone()
+                };
+                let error = self.error.clone();
+                let new_session_config = match pds_session.old_session_config() {
+                    None => {
+                        let mut error_write = error.blocking_write();
+                        error_write.push(GuiError::Other);
+                        return;
+                    }
+                    Some(config) => config.clone(),
+                };
+                tokio::spawn(async move {
+                    tracing::info!("Deactivating account");
+                    match deactivate_account(new_session_config).await {
+                        Ok(_) => {
+                            tracing::info!("Deactivated account");
+                        }
+                        Err(e) => {
+                            let mut error_write = error.write().await;
+                            error_write.push(e);
+                        }
+                    }
+                });
+            });
+            styles::render_button(ui, ctx, "Determine Missing Blobs For New Account", || {
+                let pds_session = {
+                    let pds_session_lock = self.pds_session.clone();
+                    let value = pds_session_lock.blocking_read();
+                    value.clone()
+                };
+                let error = self.error.clone();
+                let new_session_config = match pds_session.old_session_config() {
+                    None => {
+                        let mut error_write = error.blocking_write();
+                        error_write.push(GuiError::Other);
+                        return;
+                    }
+                    Some(config) => config.clone(),
+                };
+                tokio::spawn(async move {
+                    let agent = BskyAgent::builder()
+                        .build()
+                        .await
+                        .map_err(|error| {
+                            tracing::error!("{}", error.to_string());
+                            PdsError::Runtime
+                        })
+                        .unwrap();
+                    let _session = login_helper(
+                        &agent,
+                        new_session_config.host(),
+                        new_session_config.did(),
+                        new_session_config.access_token(),
+                    )
+                    .await
+                    .unwrap();
+                    tracing::info!("Getting missing blobs");
+                    match missing_blobs(&agent).await {
+                        Ok(blobs) => {
+                            let mut file = File::create("missing_blobs.txt").await.unwrap();
+                            for blob in blobs {
+                                // Get the CID as a string using Debug formatting
+                                let cid_str = format!("{:?}\n", blob.cid);
+                                file.write_all(cid_str.as_bytes()).await.unwrap();
+                            }
+                            tracing::info!("Deactivated account");
+                        }
+                        Err(e) => {
+                            let mut error_write = error.write().await;
+                            error_write.push(GuiError::Other);
+                            tracing::error!("{}", e.to_string());
                         }
                     }
                 });

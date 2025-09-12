@@ -289,7 +289,7 @@ pub async fn export_all_blobs_api(req: ExportAllBlobsRequest) -> Result<(), PdsE
     for blob in &blobs {
         match get_blob(&agent, blob.clone(), session.did.clone()).await {
             Ok(output) => {
-                tracing::info!("Successfully fetched missing blob");
+                tracing::info!("Successfully fetched blob");
                 let mut path = std::env::current_dir().unwrap();
                 path.push(session.did.as_str().replace(":", "-"));
                 path.push(
@@ -306,7 +306,7 @@ pub async fn export_all_blobs_api(req: ExportAllBlobsRequest) -> Result<(), PdsE
                     })?;
             }
             Err(_) => {
-                tracing::error!("Failed to determine missing blobs");
+                tracing::error!("Failed to determine blobs");
                 // return Err(PdsError::Validation);
             }
         }

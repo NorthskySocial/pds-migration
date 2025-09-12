@@ -280,7 +280,7 @@ impl PdsMigrationApp {
 impl Default for PdsMigrationApp {
     fn default() -> Self {
         let pds_session = Arc::new(RwLock::new(PdsSession::new(None)));
-        let page = Arc::new(RwLock::new(ScreenType::OldLogin));
+        let page = Arc::new(RwLock::new(ScreenType::Basic));
         let error = Arc::new(RwLock::new(Default::default()));
         let pds_migration_step = Arc::new(RwLock::new(Default::default()));
         let current_screen = Box::new(BasicHome::new(

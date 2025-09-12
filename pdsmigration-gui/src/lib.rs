@@ -567,6 +567,49 @@ pub async fn export_repo(pds_session: PdsSession) -> Result<(), GuiError> {
     }
 }
 
+#[tracing::instrument(skip(pds_session))]
+pub async fn export_blobs(pds_session: PdsSession) -> Result<(), GuiError> {
+    let did = match pds_session.did().clone() {
+        None => {
+            tracing::error!("No DID found");
+            return Err(GuiError::Other);
+        }
+        Some(did) => did.to_string(),
+    };
+
+    let old_session_config = match &pds_session.old_session_config() {
+        None => {
+            tracing::error!("No old session config found");
+            return Err(GuiError::Other);
+        }
+        Some(config) => config,
+    };
+    let pds_host = old_session_config.host().to_string();
+    let token = old_session_config.access_token().to_string();
+
+    tracing::info!("Exporting Repo started");
+    let request = ExportPDSRequest {
+        pds_host,
+        did,
+        token,
+    };
+    match pdsmigration_common::export_pds_api(request).await {
+        Ok(_) => {
+            tracing::info!("Exporting Repo completed");
+            Ok(())
+        }
+        Err(pds_error) => {
+            tracing::error!("Error exporting repo: {:?}", pds_error);
+            match pds_error {
+                PdsError::Login => Err(GuiError::InvalidLogin),
+                PdsError::Runtime => Err(GuiError::Runtime),
+                PdsError::AccountExport => Err(GuiError::Other),
+                _ => Err(GuiError::Other),
+            }
+        }
+    }
+}
+
 pub struct DescribePDS {
     pub terms_of_service: Option<String>,
     pub privacy_policy: Option<String>,
