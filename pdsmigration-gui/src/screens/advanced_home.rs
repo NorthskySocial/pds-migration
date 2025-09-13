@@ -8,6 +8,7 @@ use bsky_sdk::BskyAgent;
 use egui::{ScrollArea, Ui};
 use pdsmigration_common::agent::{login_helper, missing_blobs};
 use pdsmigration_common::errors::PdsError;
+use pdsmigration_common::{upload_blobs_api, UploadBlobsRequest};
 use std::sync::Arc;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
@@ -152,6 +153,56 @@ impl Screen for AdvancedHome {
                                 file.write_all(cid_str.as_bytes()).await.unwrap();
                             }
                             tracing::info!("Deactivated account");
+                        }
+                        Err(e) => {
+                            let mut error_write = error.write().await;
+                            error_write.push(GuiError::Other);
+                            tracing::error!("{}", e.to_string());
+                        }
+                    }
+                });
+            });
+            styles::render_button(ui, ctx, "Upload Blobs", || {
+                let pds_session = {
+                    let pds_session_lock = self.pds_session.clone();
+                    let value = pds_session_lock.blocking_read();
+                    value.clone()
+                };
+                let error = self.error.clone();
+                let new_session_config = match pds_session.old_session_config() {
+                    None => {
+                        let mut error_write = error.blocking_write();
+                        error_write.push(GuiError::Other);
+                        return;
+                    }
+                    Some(config) => config.clone(),
+                };
+                tokio::spawn(async move {
+                    let agent = BskyAgent::builder()
+                        .build()
+                        .await
+                        .map_err(|error| {
+                            tracing::error!("{}", error.to_string());
+                            PdsError::Runtime
+                        })
+                        .unwrap();
+                    let session = login_helper(
+                        &agent,
+                        new_session_config.host(),
+                        new_session_config.did(),
+                        new_session_config.access_token(),
+                    )
+                    .await
+                    .unwrap();
+                    tracing::info!("Uploading blobs");
+                    let upload_blob_request = UploadBlobsRequest {
+                        pds_host: new_session_config.host().to_string(),
+                        did: new_session_config.did().to_string(),
+                        token: session.access_jwt.clone(),
+                    };
+                    match upload_blobs_api(upload_blob_request).await {
+                        Ok(_) => {
+                            tracing::info!("Uploaded blobs");
                         }
                         Err(e) => {
                             let mut error_write = error.write().await;
