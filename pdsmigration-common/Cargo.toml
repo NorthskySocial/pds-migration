@@ -13,7 +13,7 @@ description = "Common framework for PDS Migration"
 
 [dependencies]
 serde = { version = "1.0.204", features = ["derive"] }
-bsky-sdk = "0.1.16"
+bsky-sdk = "0.1.21"
 ipld-core = "0.4.1"
 tracing = "0.1.41"
 serde_json = "1.0.134"

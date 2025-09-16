@@ -11,4 +11,5 @@ pub enum PdsError {
     CreateAccount,
     AccountExport,
     AccountImport,
+    RateLimitReached,
 }

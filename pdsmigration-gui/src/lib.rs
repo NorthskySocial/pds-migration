@@ -414,7 +414,7 @@ pub async fn export_all_blobs(pds_session: PdsSession) -> Result<(), GuiError> {
     match pdsmigration_common::export_all_blobs_api(request).await {
         Ok(_) => {
             tracing::info!("Exporting All Blobs completed");
-            return Ok(());
+            Ok(())
         }
         Err(pds_error) => match pds_error {
             PdsError::Validation => {
@@ -422,11 +422,11 @@ pub async fn export_all_blobs(pds_session: PdsSession) -> Result<(), GuiError> {
                     "Error exporting all blobs, validation error: {:?}",
                     pds_error
                 );
-                return Err(GuiError::Other);
+                Err(GuiError::Other)
             }
             _ => {
                 tracing::error!("Error exporting all blobs: {:?}", pds_error);
-                return Err(GuiError::Runtime);
+                Err(GuiError::Runtime)
             }
         },
     }
