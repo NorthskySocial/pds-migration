@@ -60,8 +60,8 @@ pub enum ScreenType {
     CreateNewAccount,
     ExportRepo,
     ImportRepo,
-    MigrateWithoutPds,
-    EditPLC,
+    // MigrateWithoutPds,
+    // EditPLC,
 }
 
 #[tracing::instrument(skip(session_config))]

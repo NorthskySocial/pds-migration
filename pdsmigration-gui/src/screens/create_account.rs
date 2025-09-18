@@ -137,7 +137,7 @@ impl Screen for CreateAccount {
         let available_user_domains = {
             let available_user_domains = self.available_user_domains.blocking_read();
             available_user_domains
-                .get(0)
+                .first()
                 .cloned()
                 .unwrap_or("".to_string())
         };

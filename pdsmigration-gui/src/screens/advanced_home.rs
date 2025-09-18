@@ -16,19 +16,19 @@ use tokio::sync::RwLock;
 pub struct AdvancedHome {
     pds_session: Arc<RwLock<PdsSession>>,
     error: Arc<RwLock<Vec<GuiError>>>,
-    page: Arc<RwLock<ScreenType>>,
+    _page: Arc<RwLock<ScreenType>>,
 }
 
 impl AdvancedHome {
     pub fn new(
         pds_session: Arc<RwLock<PdsSession>>,
         error: Arc<RwLock<Vec<GuiError>>>,
-        page: Arc<RwLock<ScreenType>>,
+        _page: Arc<RwLock<ScreenType>>,
     ) -> Self {
         Self {
             pds_session,
             error,
-            page,
+            _page,
         }
     }
 }
@@ -76,7 +76,7 @@ impl Screen for AdvancedHome {
                         }
                         Err(e) => {
                             let mut error_write = error.write().await;
-                            error_write.push(GuiError::from(e));
+                            error_write.push(e);
                         }
                     }
                 });
@@ -210,14 +210,14 @@ impl Screen for AdvancedHome {
                     }
                 });
             });
-            styles::render_button(ui, ctx, "Edit PLC", || {
-                let page = self.page.clone();
-                tokio::spawn(async move {
-                    tracing::info!("Editing PLC");
-                    let mut page_write = page.write().await;
-                    *page_write = ScreenType::EditPLC;
-                });
-            });
+            // styles::render_button(ui, ctx, "Edit PLC", || {
+            //     let page = self.page.clone();
+            //     tokio::spawn(async move {
+            //         tracing::info!("Editing PLC");
+            //         let mut page_write = page.write().await;
+            //         *page_write = ScreenType::EditPLC;
+            //     });
+            // });
         });
     }
 
