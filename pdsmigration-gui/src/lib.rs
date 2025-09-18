@@ -894,6 +894,7 @@ pub struct ServiceJwtPayload {
 }
 
 pub fn get_random_str() -> String {
+    #[allow(deprecated)]
     let token: String = rand::thread_rng()
         .sample_iter(&Alphanumeric)
         .take(32)
@@ -933,6 +934,7 @@ pub async fn create_service_jwt(params: ServiceJwtParams) -> String {
     };
     let to_sign_str = format!("{0}.{1}", json_to_b64url(&header), json_to_b64url(&payload));
     let hash = Sha256::digest(to_sign_str.clone());
+    #[allow(deprecated)]
     let message = Message::from_digest_slice(hash.as_ref()).unwrap();
     let mut sig = secret_key.sign_ecdsa(message);
     // Convert to low-s
@@ -980,6 +982,7 @@ pub fn atproto_sign<T: Serialize>(obj: &T, key: &SecretKey) -> [u8; 64] {
     // Hash dag_cbor to sha256
     let hash = Sha256::digest(&*unsigned_bytes);
     // Sign sha256 hash using private key
+    #[allow(deprecated)]
     let message = Message::from_digest_slice(hash.as_ref()).unwrap();
     let mut sig = key.sign_ecdsa(message);
     // Convert to low-s
@@ -991,6 +994,7 @@ pub fn atproto_sign<T: Serialize>(obj: &T, key: &SecretKey) -> [u8; 64] {
 pub fn get_keys_from_private_key_str(private_key: String) -> (SecretKey, PublicKey) {
     let secp = Secp256k1::new();
     let decoded_key = hex::decode(private_key.as_bytes()).unwrap();
+    #[allow(deprecated)]
     let secret_key = SecretKey::from_slice(&decoded_key).unwrap();
     let public_key = secret_key.public_key(&secp);
     (secret_key, public_key)
@@ -1004,6 +1008,7 @@ pub fn decode_did_secret_key(private_key: &str) -> (SecretKey, PublicKey) {
             panic!()
         })
         .unwrap();
+    #[allow(deprecated)]
     let secret_key = SecretKey::from_slice(&decoded_key)
         .map_err(|_error| {
             let _context = format!("Issue creating secret key from input '{private_key}'");
