@@ -541,7 +541,7 @@ pub async fn download_blob(pds_host: &str, request: &GetBlobRequest) -> Result<V
             }
         }
         Err(e) => {
-            tracing::error!("Error creating account: {:?}", e);
+            tracing::error!("Error downloading blob: {:?}", e);
             return Err(PdsError::Validation);
         }
     }
