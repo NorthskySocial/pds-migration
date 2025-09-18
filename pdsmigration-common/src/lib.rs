@@ -334,7 +334,7 @@ pub async fn export_all_blobs_api(req: ExportAllBlobsRequest) -> Result<(), PdsE
                 let mut path = std::env::current_dir().unwrap();
                 path.push(session.did.as_str().replace(":", "-"));
                 path.push(
-                    format!("{:?}", blob)
+                    format!("{blob:?}")
                         .strip_prefix("Cid(Cid(")
                         .unwrap()
                         .strip_suffix("))")

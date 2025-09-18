@@ -3,8 +3,7 @@ use crate::screens::Screen;
 use crate::session::session_config::PdsSession;
 use crate::{
     create_service_jwt, create_update_op, encode_did_key, fetch_tos_and_privacy_policy,
-    get_keys_from_private_key_str, import_repo, migrate_preferences, styles, upload_blobs,
-    ScreenType, ServiceJwtParams,
+    import_repo, migrate_preferences, styles, upload_blobs, ScreenType, ServiceJwtParams,
 };
 use bsky_sdk::api::agent::Configure;
 use bsky_sdk::api::types::string::Did;
@@ -21,8 +20,6 @@ use secp256k1::{Keypair, Secp256k1, SecretKey};
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
-use tokio::io::AsyncReadExt;
-use tokio::io::AsyncWriteExt;
 use tokio::sync::RwLock;
 
 enum MigrationStep {
@@ -229,7 +226,7 @@ impl MigrateWithoutPds {
         let temporary_signing_keypair = self.temporary_signing_keypair.clone();
         let signing_public_key = temporary_signing_keypair.public_key();
         let formatted_public_signing_key = encode_did_key(&signing_public_key);
-        let signing_secret_key = temporary_signing_keypair.secret_key();
+        let _signing_secret_key = temporary_signing_keypair.secret_key();
         let new_handle = self.new_handle.clone();
         let new_password = self.new_password.clone();
         let new_email = self.new_email.clone();
@@ -238,7 +235,7 @@ impl MigrateWithoutPds {
         } else {
             Some(self.invite_code.clone())
         };
-        let error_lock = self.error.clone();
+        let _error_lock = self.error.clone();
 
         tokio::spawn(async move {
             let audit_log = get_plc_audit_log(did.as_str()).await;

@@ -23,6 +23,7 @@ impl From<PdsError> for ApiError {
             PdsError::CreateAccount => ApiError::CreateAccount,
             PdsError::AccountExport => ApiError::AccountExport,
             PdsError::AccountImport => ApiError::AccountImport,
+            PdsError::RateLimitReached => ApiError::Runtime,
         }
     }
 }

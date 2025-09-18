@@ -6,7 +6,6 @@ use crate::styles::WIDGET_SPACING_BASE;
 use crate::{styles, ScreenType};
 use bsky_sdk::BskyAgent;
 use egui::Ui;
-use std::any::Any;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 

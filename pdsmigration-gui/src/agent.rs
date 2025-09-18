@@ -88,7 +88,7 @@ pub async fn confirm_email_token(
         .await
     {
         Ok(res) => Ok(res),
-        Err(e) => Err(GuiError::Runtime),
+        Err(_e) => Err(GuiError::Runtime),
     }
     // match agent.login(username, password).await {
     //     Ok(res) => Ok(res),

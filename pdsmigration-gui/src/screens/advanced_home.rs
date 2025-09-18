@@ -1,9 +1,7 @@
 use crate::errors::GuiError;
 use crate::screens::Screen;
 use crate::session::session_config::PdsSession;
-use crate::{
-    activate_account, deactivate_account, export_repo, migrate_preferences, styles, ScreenType,
-};
+use crate::{activate_account, deactivate_account, export_repo, styles, ScreenType};
 use bsky_sdk::BskyAgent;
 use egui::{ScrollArea, Ui};
 use pdsmigration_common::agent::{login_helper, missing_blobs};
