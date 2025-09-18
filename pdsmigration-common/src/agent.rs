@@ -3,7 +3,6 @@ use crate::{CreateAccountRequest, CreateAccountWithoutPDSRequest, GetBlobRequest
 use bsky_sdk::api::agent::atp_agent::AtpSession;
 use bsky_sdk::api::agent::Configure;
 use bsky_sdk::api::app::bsky::actor::defs::Preferences;
-use bsky_sdk::api::app::bsky::feed::get_likes::ParametersData;
 use bsky_sdk::api::com::atproto::identity::sign_plc_operation::InputData;
 use bsky_sdk::api::com::atproto::repo::list_missing_blobs::RecordBlob;
 use bsky_sdk::api::types::string::{Cid, Did, Handle, Nsid};

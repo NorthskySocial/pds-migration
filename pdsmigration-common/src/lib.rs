@@ -2,7 +2,7 @@ use crate::agent::{
     account_export, account_import, activate_account, create_account, deactivate_account,
     download_blob, export_preferences, get_blob, get_service_auth, import_preferences,
     list_all_blobs, login_helper, missing_blobs, recommended_plc, request_token, sign_plc,
-    submit_plc, upload_blob, PlcOpService, PlcOperation,
+    submit_plc, upload_blob,
 };
 use crate::errors::PdsError;
 use bsky_sdk::api::agent::Configure;
