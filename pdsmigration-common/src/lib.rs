@@ -1,18 +1,18 @@
 use crate::agent::{
     account_export, account_import, activate_account, create_account, deactivate_account,
-    export_preferences, get_blob, get_plc_audit_log, get_recommended, get_service_auth,
-    import_preferences, list_all_blobs, login_helper, missing_blobs, recommended_plc,
-    request_token, sign_plc, submit_plc, upload_blob, PlcOpService, PlcOperation,
+    download_blob, export_preferences, get_blob, get_service_auth, import_preferences,
+    list_all_blobs, login_helper, missing_blobs, recommended_plc, request_token, sign_plc,
+    submit_plc, upload_blob,
 };
 use crate::errors::PdsError;
 use bsky_sdk::api::agent::Configure;
 use bsky_sdk::api::types::string::Did;
 use bsky_sdk::BskyAgent;
-use ipld_core::cid::Cid;
 use multibase::Base::Base58Btc;
-use secp256k1::{PublicKey, Secp256k1};
+use secp256k1::PublicKey;
 use serde::{Deserialize, Serialize};
 use std::io::ErrorKind;
+use std::time::Duration;
 
 pub mod agent;
 pub mod errors;
@@ -81,6 +81,13 @@ pub struct CreateAccountWithoutPDSRequest {
     pub verification_code: Option<String>,
     pub verification_phone: Option<String>,
     pub plc_op: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GetBlobRequest {
+    pub did: Did,
+    pub cid: String,
+    pub token: String,
 }
 
 #[tracing::instrument(skip(req))]
@@ -176,7 +183,7 @@ pub async fn missing_blobs_api(req: MissingBlobsRequest) -> Result<String, PdsEr
     let initial_missing_blobs = missing_blobs(&agent).await?;
     let mut missing_blob_cids = Vec::new();
     for blob in &initial_missing_blobs {
-        missing_blob_cids.push(Cid::to_string(blob.cid.as_ref()));
+        missing_blob_cids.push(format!("{:?}", blob.cid));
     }
 
     let response = serde_json::to_string(&missing_blob_cids).unwrap();
@@ -225,29 +232,63 @@ pub async fn export_blobs_api(req: ExportBlobsRequest) -> Result<(), PdsError> {
         }
     }
     for missing_blob in &missing_blobs {
-        match get_blob(&agent, missing_blob.cid.clone(), session.did.clone()).await {
-            Ok(output) => {
-                tracing::info!("Successfully fetched missing blob");
-                let mut path = std::env::current_dir().unwrap();
-                path.push(session.did.as_str().replace(":", "-"));
-                path.push(
-                    missing_blob
-                        .record_uri
-                        .as_str()
-                        .split("/")
-                        .last()
-                        .unwrap_or("fallback"),
-                );
-                tokio::fs::write(path.as_path(), output)
-                    .await
-                    .map_err(|error| {
-                        tracing::error!("{}", error.to_string());
-                        PdsError::AccountExport
-                    })?;
-            }
-            Err(_) => {
-                tracing::error!("Failed to determine missing blobs");
-                // return Err(PdsError::Validation);
+        let session = agent.get_session().await.unwrap();
+        let mut filepath = std::env::current_dir().unwrap();
+        filepath.push(session.did.as_str().replace(":", "-"));
+        filepath.push(
+            missing_blob
+                .record_uri
+                .as_str()
+                .split("/")
+                .last()
+                .unwrap_or("fallback"),
+        );
+        if !tokio::fs::try_exists(filepath).await.unwrap() {
+            let get_blob_request = GetBlobRequest {
+                did: session.did.clone(),
+                cid: missing_blob
+                    .record_uri
+                    .as_str()
+                    .split("/")
+                    .last()
+                    .unwrap_or("fallback")
+                    .to_string(),
+                token: session.access_jwt.clone(),
+            };
+            match download_blob(agent.get_endpoint().await.as_str(), &get_blob_request).await {
+                Ok(output) => {
+                    tracing::info!("Successfully fetched missing blob");
+                    let mut path = std::env::current_dir().unwrap();
+                    path.push(session.did.as_str().replace(":", "-"));
+                    path.push(
+                        missing_blob
+                            .record_uri
+                            .as_str()
+                            .split("/")
+                            .last()
+                            .unwrap_or("fallback"),
+                    );
+                    tokio::fs::write(path.as_path(), output)
+                        .await
+                        .map_err(|error| {
+                            tracing::error!("{}", error.to_string());
+                            PdsError::AccountExport
+                        })?;
+                }
+                Err(e) => {
+                    match e {
+                        PdsError::RateLimitReached => {
+                            tracing::error!("Rate limit reached, waiting 5 minutes");
+                            let five_minutes = Duration::from_secs(300);
+                            tokio::time::sleep(five_minutes).await;
+                        }
+                        _ => {
+                            tracing::error!("Failed to determine missing blobs");
+                            return Err(PdsError::Validation);
+                        }
+                    }
+                    tracing::error!("Failed to determine missing blobs");
+                }
             }
         }
     }
@@ -293,10 +334,11 @@ pub async fn export_all_blobs_api(req: ExportAllBlobsRequest) -> Result<(), PdsE
                 let mut path = std::env::current_dir().unwrap();
                 path.push(session.did.as_str().replace(":", "-"));
                 path.push(
-                    Cid::to_string(blob.as_ref())
-                        .split("/")
-                        .last()
-                        .unwrap_or("fallback"),
+                    format!("{blob:?}")
+                        .strip_prefix("Cid(Cid(")
+                        .unwrap()
+                        .strip_suffix("))")
+                        .unwrap(),
                 );
                 tokio::fs::write(path.as_path(), output)
                     .await
@@ -547,4 +589,54 @@ pub fn public_key_to_did_key(public_key: PublicKey) -> String {
     let pk_multibase = multibase::encode(Base58Btc, pk_wrapped.as_slice());
     let public_key_str = format!("did:key:{pk_multibase}");
     public_key_str
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use secp256k1::{Secp256k1, SecretKey};
+    use std::str::FromStr;
+
+    #[test]
+    fn test_multicodec_wrap() {
+        let test_bytes = vec![0x01, 0x02, 0x03];
+        let wrapped = multicodec_wrap(test_bytes.clone());
+
+        // Should start with secp256k1 multicodec prefix (0xe7)
+        assert_eq!(wrapped[0], 0xe7);
+        // Should contain original bytes at the end
+        assert!(wrapped.ends_with(&test_bytes));
+        assert!(wrapped.len() > test_bytes.len());
+    }
+
+    #[test]
+    fn test_public_key_to_did_key() {
+        let secp = Secp256k1::new();
+        // Use a known test private key
+        let secret_key =
+            SecretKey::from_str("0000000000000000000000000000000000000000000000000000000000000001")
+                .expect("Valid secret key");
+        let public_key = PublicKey::from_secret_key(&secp, &secret_key);
+
+        let did_key = public_key_to_did_key(public_key);
+
+        // Should start with "did:key:"
+        assert!(did_key.starts_with("did:key:"));
+        // Should be a reasonable length (did:key: + base58btc encoded multicodec wrapped pubkey)
+        assert!(did_key.len() > 50);
+        // Should be deterministic for the same key
+        let did_key_2 = public_key_to_did_key(public_key);
+        assert_eq!(did_key, did_key_2);
+    }
+
+    #[test]
+    fn test_multicodec_wrap_empty() {
+        let empty_bytes = vec![];
+        let wrapped = multicodec_wrap(empty_bytes);
+
+        // Should still have the multicodec prefix even for empty input
+        assert_eq!(wrapped[0], 0xe7);
+        // Varint encoding of 0xe7 takes 2 bytes since 0xe7 > 127
+        assert_eq!(wrapped.len(), 2);
+    }
 }

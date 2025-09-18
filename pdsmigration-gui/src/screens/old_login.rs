@@ -6,7 +6,6 @@ use crate::styles::WIDGET_SPACING_BASE;
 use crate::{styles, ScreenType};
 use bsky_sdk::BskyAgent;
 use egui::Ui;
-use std::any::Any;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -16,7 +15,7 @@ pub struct OldLogin {
     username: String,
     password: String,
     email_token_page: Arc<RwLock<bool>>,
-    email: String,
+    _email: String,
     email_token: String,
     pds_session: Arc<RwLock<PdsSession>>,
     error: Arc<RwLock<Vec<GuiError>>>,
@@ -34,7 +33,7 @@ impl OldLogin {
             username: "".to_string(),
             password: "".to_string(),
             email_token_page: Arc::new(Default::default()),
-            email: "".to_string(),
+            _email: "".to_string(),
             email_token: "".to_string(),
             pds_session,
             error,

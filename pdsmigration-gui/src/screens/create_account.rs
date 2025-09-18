@@ -133,11 +133,11 @@ impl CreateAccount {
 
 impl Screen for CreateAccount {
     fn ui(&mut self, ui: &mut Ui, ctx: &egui::Context) {
-        let handle = self.new_handle.clone();
+        let _handle = self.new_handle.clone();
         let available_user_domains = {
             let available_user_domains = self.available_user_domains.blocking_read();
             available_user_domains
-                .get(0)
+                .first()
                 .cloned()
                 .unwrap_or("".to_string())
         };

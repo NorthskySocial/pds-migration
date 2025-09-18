@@ -60,8 +60,8 @@ pub enum ScreenType {
     CreateNewAccount,
     ExportRepo,
     ImportRepo,
-    MigrateWithoutPds,
-    EditPLC,
+    // MigrateWithoutPds,
+    // EditPLC,
 }
 
 #[tracing::instrument(skip(session_config))]
@@ -125,7 +125,7 @@ pub fn generate_recovery_key(user_recovery_key_password: String) -> Result<Strin
     let sk_str = secret_key.secret_bytes().encode_hex::<String>();
     let sk_wrapped = multicodec_wrap(sk_compact.to_vec());
     let sk_multibase = multibase::encode(Base58Btc, sk_wrapped.as_slice());
-    let secret_key_str = format!("did:key:{sk_multibase}");
+    let _secret_key_str = format!("did:key:{sk_multibase}");
 
     let path = std::path::Path::new("RotationKey.zip");
     let file = match std::fs::File::create(path) {
@@ -414,7 +414,7 @@ pub async fn export_all_blobs(pds_session: PdsSession) -> Result<(), GuiError> {
     match pdsmigration_common::export_all_blobs_api(request).await {
         Ok(_) => {
             tracing::info!("Exporting All Blobs completed");
-            return Ok(());
+            Ok(())
         }
         Err(pds_error) => match pds_error {
             PdsError::Validation => {
@@ -422,11 +422,11 @@ pub async fn export_all_blobs(pds_session: PdsSession) -> Result<(), GuiError> {
                     "Error exporting all blobs, validation error: {:?}",
                     pds_error
                 );
-                return Err(GuiError::Other);
+                Err(GuiError::Other)
             }
             _ => {
                 tracing::error!("Error exporting all blobs: {:?}", pds_error);
-                return Err(GuiError::Runtime);
+                Err(GuiError::Runtime)
             }
         },
     }
@@ -894,6 +894,7 @@ pub struct ServiceJwtPayload {
 }
 
 pub fn get_random_str() -> String {
+    #[allow(deprecated)]
     let token: String = rand::thread_rng()
         .sample_iter(&Alphanumeric)
         .take(32)
@@ -903,7 +904,7 @@ pub fn get_random_str() -> String {
 }
 
 pub fn json_to_b64url<T: Serialize>(obj: &T) -> String {
-    Base64::encode_string((&serde_json::to_string(obj).unwrap()).as_ref()).replace("=", "")
+    Base64::encode_string(serde_json::to_string(obj).unwrap().as_ref()).replace("=", "")
 }
 
 pub async fn create_service_jwt(params: ServiceJwtParams) -> String {
@@ -917,7 +918,7 @@ pub async fn create_service_jwt(params: ServiceJwtParams) -> String {
         .duration_since(SystemTime::UNIX_EPOCH)
         .expect("timestamp in micros since UNIX epoch")
         .as_micros() as usize;
-    let exp = params.exp.unwrap_or(((now + 6000 as usize) / 1000) as u64);
+    let exp = params.exp.unwrap_or(((now + 6000_usize) / 1000) as u64);
     let lxm = params.lxm;
     let jti = get_random_str();
     let header = ServiceJwtHeader {
@@ -933,6 +934,7 @@ pub async fn create_service_jwt(params: ServiceJwtParams) -> String {
     };
     let to_sign_str = format!("{0}.{1}", json_to_b64url(&header), json_to_b64url(&payload));
     let hash = Sha256::digest(to_sign_str.clone());
+    #[allow(deprecated)]
     let message = Message::from_digest_slice(hash.as_ref()).unwrap();
     let mut sig = secret_key.sign_ecdsa(message);
     // Convert to low-s
@@ -980,18 +982,19 @@ pub fn atproto_sign<T: Serialize>(obj: &T, key: &SecretKey) -> [u8; 64] {
     // Hash dag_cbor to sha256
     let hash = Sha256::digest(&*unsigned_bytes);
     // Sign sha256 hash using private key
+    #[allow(deprecated)]
     let message = Message::from_digest_slice(hash.as_ref()).unwrap();
     let mut sig = key.sign_ecdsa(message);
     // Convert to low-s
     sig.normalize_s();
     // ASN.1 encoded per decode_dss_signature
-    let normalized_compact_sig = sig.serialize_compact();
-    normalized_compact_sig
+    sig.serialize_compact()
 }
 
 pub fn get_keys_from_private_key_str(private_key: String) -> (SecretKey, PublicKey) {
     let secp = Secp256k1::new();
     let decoded_key = hex::decode(private_key.as_bytes()).unwrap();
+    #[allow(deprecated)]
     let secret_key = SecretKey::from_slice(&decoded_key).unwrap();
     let public_key = secret_key.public_key(&secp);
     (secret_key, public_key)
@@ -1000,14 +1003,15 @@ pub fn get_keys_from_private_key_str(private_key: String) -> (SecretKey, PublicK
 pub fn decode_did_secret_key(private_key: &str) -> (SecretKey, PublicKey) {
     let secp = Secp256k1::new();
     let decoded_key = hex::decode(private_key.as_bytes())
-        .map_err(|error| {
-            let context = format!("Issue decoding hex '{private_key}'");
+        .map_err(|_error| {
+            let _context = format!("Issue decoding hex '{private_key}'");
             panic!()
         })
         .unwrap();
+    #[allow(deprecated)]
     let secret_key = SecretKey::from_slice(&decoded_key)
-        .map_err(|error| {
-            let context = format!("Issue creating secret key from input '{private_key}'");
+        .map_err(|_error| {
+            let _context = format!("Issue creating secret key from input '{private_key}'");
             panic!()
         })
         .unwrap();

@@ -75,31 +75,31 @@ impl BasicHome {
                     }
                 });
             });
-            styles::render_button(ui, ctx, "Advanced Tools", || {
-                let pds_migration_step = self.pds_migration_step.clone();
-                let page_lock = self.page.clone();
-                tokio::spawn(async move {
-                    let mut pds_migration_step = pds_migration_step.write().await;
-                    *pds_migration_step = true;
-                    let mut page = page_lock.write().await;
-                    *page = ScreenType::MigrateWithoutPds;
-                });
-            });
+            // styles::render_button(ui, ctx, "Advanced Tools", || {
+            //     let pds_migration_step = self.pds_migration_step.clone();
+            //     let page_lock = self.page.clone();
+            //     tokio::spawn(async move {
+            //         let mut pds_migration_step = pds_migration_step.write().await;
+            //         *pds_migration_step = true;
+            //         let mut page = page_lock.write().await;
+            //         *page = ScreenType::MigrateWithoutPds;
+            //     });
+            // });
         });
     }
 
-    pub fn show_logged_out(&self, ui: &mut Ui, ctx: &egui::Context) {
-        ScrollArea::both().show(ui, |ui| {
-            styles::render_button(ui, ctx, "Migrate to PDS without a PDS", || {
-                let pds_migration_step = self.pds_migration_step.clone();
-                let page_lock = self.page.clone();
-                tokio::spawn(async move {
-                    let mut pds_migration_step = pds_migration_step.write().await;
-                    *pds_migration_step = true;
-                    let mut page = page_lock.write().await;
-                    *page = ScreenType::MigrateWithoutPds;
-                });
-            });
+    pub fn show_logged_out(&self, ui: &mut Ui, _ctx: &egui::Context) {
+        ScrollArea::both().show(ui, |_ui| {
+            // styles::render_button(ui, ctx, "Migrate to PDS without a PDS", || {
+            //     let pds_migration_step = self.pds_migration_step.clone();
+            //     let page_lock = self.page.clone();
+            //     tokio::spawn(async move {
+            //         let mut pds_migration_step = pds_migration_step.write().await;
+            //         *pds_migration_step = true;
+            //         let mut page = page_lock.write().await;
+            //         *page = ScreenType::MigrateWithoutPds;
+            //     });
+            // });
         });
     }
 }

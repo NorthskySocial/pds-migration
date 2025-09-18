@@ -1,5 +1,5 @@
 use crate::errors::PdsError;
-use crate::{CreateAccountRequest, CreateAccountWithoutPDSRequest};
+use crate::{CreateAccountRequest, CreateAccountWithoutPDSRequest, GetBlobRequest};
 use bsky_sdk::api::agent::atp_agent::AtpSession;
 use bsky_sdk::api::agent::Configure;
 use bsky_sdk::api::app::bsky::actor::defs::Preferences;
@@ -498,6 +498,53 @@ pub async fn create_account(
         }
     }
     Ok(())
+}
+
+#[tracing::instrument(skip(request))]
+pub async fn download_blob(pds_host: &str, request: &GetBlobRequest) -> Result<Vec<u8>, PdsError> {
+    let client = reqwest::Client::new();
+    let url = format!("{pds_host}/xrpc/com.atproto.sync.getBlob");
+    let result = client
+        .get(url)
+        .query(&[
+            ("did", request.did.as_str().to_string()),
+            ("cid", request.cid.clone()),
+        ])
+        .header("Content-Type", "application/json")
+        .bearer_auth(request.token.clone())
+        .send()
+        .await;
+    match result {
+        Ok(output) => {
+            let ratelimit_remaining = output
+                .headers()
+                .get("ratelimit-remaining")
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .parse::<i32>()
+                .unwrap_or(1000);
+            if ratelimit_remaining < 100 {
+                return Err(PdsError::RateLimitReached);
+            }
+
+            match output.status() {
+                reqwest::StatusCode::OK => {
+                    tracing::info!("Successfully created account");
+                    Ok(output.bytes().await.unwrap().to_vec())
+                }
+                _ => {
+                    tracing::error!("Error creating account: {:?}", output);
+                    tracing::error!("More: {:?}", output.text().await);
+                    Err(PdsError::Validation)
+                }
+            }
+        }
+        Err(e) => {
+            tracing::error!("Error downloading blob: {:?}", e);
+            return Err(PdsError::Validation);
+        }
+    }
 }
 
 #[tracing::instrument(skip(account_request))]
