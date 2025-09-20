@@ -17,12 +17,15 @@ bsky-sdk = "0.1.21"
 ipld-core = "0.4.1"
 tracing = "0.1.41"
 serde_json = "1.0.134"
-reqwest = { version = "0.12.12", features = ["json"] }
+reqwest = { version = "0.12.12", features = ["json", "stream"] }
 derive_more = { version = "2.0.1" ,features = ["display",  "error"]}
 rand = "0.9.2"
 secp256k1 = { version = "0.31.0", features = ["rand"] }
 multibase = "0.9.1"
 unsigned-varint = "0.8.0"
+futures-core = "0.3.31"
+bytes = "1.10.0"
+futures-util = "0.3.31"
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
