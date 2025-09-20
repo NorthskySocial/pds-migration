@@ -67,7 +67,7 @@ pub struct CreateAccountRequest {
     pub verification_code: Option<String>,
     pub verification_phone: Option<String>,
     pub plc_op: Option<String>,
-    pub token: String,
+    pub token: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -104,7 +104,7 @@ pub async fn create_account_api(req: CreateAccountApiRequest) -> Result<(), PdsE
             verification_code: Some(String::from("")),
             verification_phone: None,
             plc_op: None,
-            token: req.token.clone(),
+            token: Some(req.token.clone()),
         },
     )
     .await?;
