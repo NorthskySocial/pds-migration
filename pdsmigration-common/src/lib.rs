@@ -1,18 +1,19 @@
 use crate::agent::{
-    account_export, account_import, activate_account, create_account, deactivate_account,
-    download_blob, export_preferences, get_blob, get_service_auth, import_preferences,
-    list_all_blobs, login_helper, missing_blobs, recommended_plc, request_token, sign_plc,
-    submit_plc, upload_blob,
+    account_import, activate_account, create_account, deactivate_account, download_blob,
+    download_repo, export_preferences, get_service_auth, import_preferences, list_all_blobs,
+    login_helper, missing_blobs, recommended_plc, request_token, sign_plc, submit_plc, upload_blob,
 };
 use crate::errors::PdsError;
 use bsky_sdk::api::agent::Configure;
 use bsky_sdk::api::types::string::Did;
 use bsky_sdk::BskyAgent;
+use futures_util::StreamExt;
 use multibase::Base::Base58Btc;
 use secp256k1::PublicKey;
 use serde::{Deserialize, Serialize};
 use std::io::ErrorKind;
 use std::time::Duration;
+use tokio::io::AsyncWriteExt;
 
 pub mod agent;
 pub mod errors;
@@ -90,6 +91,12 @@ pub struct GetBlobRequest {
     pub token: String,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GetRepoRequest {
+    pub did: Did,
+    pub token: String,
+}
+
 #[tracing::instrument(skip(req))]
 pub async fn create_account_api(req: CreateAccountApiRequest) -> Result<(), PdsError> {
     create_account(
@@ -131,7 +138,38 @@ pub async fn export_pds_api(req: ExportPDSRequest) -> Result<(), PdsError> {
         req.token.as_str(),
     )
     .await?;
-    account_export(&agent, &session.did).await?;
+    let get_repo_request = GetRepoRequest {
+        did: session.did.clone(),
+        token: session.access_jwt.clone(),
+    };
+    match download_repo(agent.get_endpoint().await.as_str(), &get_repo_request).await {
+        Ok(mut stream) => {
+            tracing::info!("Successfully downloaded repo");
+            let mut path = std::env::current_dir().unwrap();
+            path.push(session.did.clone().replace(":", "-") + ".car");
+            let mut file = tokio::fs::File::create(path.as_path()).await.unwrap();
+
+            while let Some(chunk) = stream.next().await {
+                let chunk = chunk.unwrap();
+                file.write_all(&chunk).await.unwrap();
+            }
+            return Ok(());
+        }
+        Err(e) => {
+            match e {
+                PdsError::RateLimitReached => {
+                    tracing::error!("Rate limit reached, waiting 5 minutes");
+                    let five_minutes = Duration::from_secs(300);
+                    tokio::time::sleep(five_minutes).await;
+                }
+                _ => {
+                    tracing::error!("Failed to download repo");
+                    return Err(PdsError::Validation);
+                }
+            }
+            tracing::error!("Failed to download Repo");
+        }
+    }
     Ok(())
 }
 
@@ -256,24 +294,25 @@ pub async fn export_blobs_api(req: ExportBlobsRequest) -> Result<(), PdsError> {
                 token: session.access_jwt.clone(),
             };
             match download_blob(agent.get_endpoint().await.as_str(), &get_blob_request).await {
-                Ok(output) => {
+                Ok(mut stream) => {
                     tracing::info!("Successfully fetched missing blob");
                     let mut path = std::env::current_dir().unwrap();
                     path.push(session.did.as_str().replace(":", "-"));
                     path.push(
-                        missing_blob
-                            .record_uri
-                            .as_str()
-                            .split("/")
-                            .last()
-                            .unwrap_or("fallback"),
+                        format!("{missing_blob:?}")
+                            .strip_prefix("Cid(Cid(")
+                            .unwrap()
+                            .strip_suffix("))")
+                            .unwrap(),
                     );
-                    tokio::fs::write(path.as_path(), output)
-                        .await
-                        .map_err(|error| {
-                            tracing::error!("{}", error.to_string());
-                            PdsError::AccountExport
-                        })?;
+                    let mut file = tokio::fs::File::create(path.as_path()).await.unwrap();
+
+                    while let Some(chunk) = stream.next().await {
+                        let chunk = chunk.unwrap();
+                        file.write_all(&chunk).await.unwrap();
+                    }
+
+                    file.flush().await.unwrap();
                 }
                 Err(e) => {
                     match e {
@@ -328,31 +367,67 @@ pub async fn export_all_blobs_api(req: ExportAllBlobsRequest) -> Result<(), PdsE
         }
     }
     for blob in &blobs {
-        match get_blob(&agent, blob.clone(), session.did.clone()).await {
-            Ok(output) => {
-                tracing::info!("Successfully fetched blob");
-                let mut path = std::env::current_dir().unwrap();
-                path.push(session.did.as_str().replace(":", "-"));
-                path.push(
-                    format!("{blob:?}")
-                        .strip_prefix("Cid(Cid(")
-                        .unwrap()
-                        .strip_suffix("))")
-                        .unwrap(),
-                );
-                tokio::fs::write(path.as_path(), output)
-                    .await
-                    .map_err(|error| {
-                        tracing::error!("{}", error.to_string());
-                        PdsError::AccountExport
-                    })?;
-            }
-            Err(_) => {
-                tracing::error!("Failed to determine blobs");
-                // return Err(PdsError::Validation);
+        let session = agent.get_session().await.unwrap();
+        let mut filepath = std::env::current_dir().unwrap();
+        filepath.push(session.did.as_str().replace(":", "-"));
+        filepath.push(
+            format!("{blob:?}")
+                .strip_prefix("Cid(Cid(")
+                .unwrap()
+                .strip_suffix("))")
+                .unwrap(),
+        );
+        if !tokio::fs::try_exists(filepath).await.unwrap() {
+            let get_blob_request = GetBlobRequest {
+                did: session.did.clone(),
+                cid: format!("{blob:?}")
+                    .strip_prefix("Cid(Cid(")
+                    .unwrap()
+                    .strip_suffix("))")
+                    .unwrap()
+                    .to_string(),
+                token: session.access_jwt.clone(),
+            };
+            match download_blob(agent.get_endpoint().await.as_str(), &get_blob_request).await {
+                Ok(mut stream) => {
+                    tracing::info!("Successfully fetched missing blob");
+                    let mut path = std::env::current_dir().unwrap();
+                    path.push(session.did.as_str().replace(":", "-"));
+                    path.push(
+                        format!("{blob:?}")
+                            .strip_prefix("Cid(Cid(")
+                            .unwrap()
+                            .strip_suffix("))")
+                            .unwrap(),
+                    );
+                    let mut file = tokio::fs::File::create(path.as_path()).await.unwrap();
+
+                    while let Some(chunk) = stream.next().await {
+                        let chunk = chunk.unwrap();
+                        file.write_all(&chunk).await.unwrap();
+                    }
+
+                    file.flush().await.unwrap();
+                }
+                Err(e) => {
+                    match e {
+                        PdsError::RateLimitReached => {
+                            tracing::error!("Rate limit reached, waiting 5 minutes");
+                            let five_minutes = Duration::from_secs(300);
+                            tokio::time::sleep(five_minutes).await;
+                        }
+                        _ => {
+                            tracing::error!("Failed to determine missing blobs");
+                            return Err(PdsError::Validation);
+                        }
+                    }
+                    tracing::error!("Failed to determine missing blobs");
+                }
             }
         }
     }
+    //
+
     Ok(())
 }
 
