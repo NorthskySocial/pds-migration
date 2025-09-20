@@ -478,7 +478,6 @@ pub async fn create_account(
         .post(pds_host.to_string() + "/xrpc/com.atproto.server.createAccount")
         .body(x)
         .header("Content-Type", "application/json")
-        .bearer_auth(account_request.token.clone())
         .send()
         .await;
     match result {
