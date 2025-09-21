@@ -1,12 +1,12 @@
 use crate::error_window::ErrorWindow;
 use crate::errors::GuiError;
+use crate::log_viewer::{LogBuffer, LogViewer};
 use crate::screens::basic_home::BasicHome;
 use crate::screens::old_login::OldLogin;
 use crate::screens::Screen;
 use crate::session::session_config::PdsSession;
 use crate::{screens, styles, ScreenType};
-use egui::{Align, Color32, Layout, RichText, Theme, Ui};
-use egui_tracing::EventCollector;
+use egui::{Align, Color32, Layout, RichText, Theme, TopBottomPanel, Ui};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -17,15 +17,40 @@ pub struct PdsMigrationApp {
     pds_migration_step: Arc<RwLock<bool>>,
     error: Arc<RwLock<Vec<GuiError>>>,
     page: Arc<RwLock<ScreenType>>,
-    collector: EventCollector,
+    log_viewer: LogViewer,
+    log_buffer: LogBuffer,
 }
 
 impl PdsMigrationApp {
-    pub fn new(_cc: &eframe::CreationContext<'_>, collector: EventCollector) -> Self {
+    pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+        // Create the log buffer and viewer
+        let log_buffer = LogBuffer::new(1000); // Store up to 1000 log entries
+        let log_viewer = LogViewer::new(log_buffer.clone());
+
+        // Log some initial messages
+        log_buffer.info("Application started");
+        log_buffer.debug("Debug mode enabled");
+
+        // Initialize tracing support if needed
+        if let Err(err) = crate::log_viewer::tracing_support::init_tracing(log_buffer.clone()) {
+            log_buffer.error(format!("Failed to initialize tracing: {}", err));
+        }
+
         Self {
-            collector,
+            log_viewer,
+            log_buffer,
             ..Default::default()
         }
+    }
+
+    // Method to get the log buffer for use in other parts of your application
+    pub fn log_buffer(&self) -> LogBuffer {
+        self.log_buffer.clone()
+    }
+
+    // You can create a helper method to render the log viewer
+    fn show_log_viewer(&mut self, ui: &mut Ui) {
+        self.log_viewer.ui(ui);
     }
 
     // Helper function to create consistent navigation buttons
@@ -132,9 +157,13 @@ impl PdsMigrationApp {
     }
 
     fn show_bottom_panel(&mut self, ctx: &egui::Context) {
-        egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
-            ui.add(egui_tracing::Logs::new(self.collector.clone()));
-        });
+        TopBottomPanel::bottom("log_viewer_panel")
+            .resizable(true)
+            .default_height(200.0)
+            .show(ctx, |ui| {
+                ui.heading("Log Viewer");
+                self.show_log_viewer(ui);
+            });
     }
 
     fn show_central_panel(&mut self, ctx: &egui::Context) {
@@ -239,17 +268,6 @@ impl PdsMigrationApp {
                 self.error.clone(),
                 self.page.clone(),
             )),
-            // ScreenType::MigrateWithoutPds => {
-            //     Box::new(screens::migrate_without_pds::MigrateWithoutPds::new(
-            //         self.error.clone(),
-            //         self.page.clone(),
-            //     ))
-            // }
-            // ScreenType::EditPLC => Box::new(screens::edit_plc::EditPlc::new(
-            //     self.pds_session.clone(),
-            //     self.error.clone(),
-            //     self.page.clone(),
-            // )),
         };
 
         // Reassign the current_screen
@@ -283,6 +301,8 @@ impl Default for PdsMigrationApp {
         let page = Arc::new(RwLock::new(ScreenType::Basic));
         let error = Arc::new(RwLock::new(Default::default()));
         let pds_migration_step = Arc::new(RwLock::new(Default::default()));
+        let log_buffer = LogBuffer::new(1000);
+        let log_viewer = LogViewer::new(log_buffer.clone());
         let current_screen = Box::new(BasicHome::new(
             pds_session.clone(),
             error.clone(),
@@ -295,8 +315,9 @@ impl Default for PdsMigrationApp {
             error_windows: vec![],
             pds_session: Arc::new(RwLock::new(PdsSession::new(None))),
             pds_migration_step,
-            collector: Default::default(),
+            log_viewer,
             error,
+            log_buffer,
         }
     }
 }

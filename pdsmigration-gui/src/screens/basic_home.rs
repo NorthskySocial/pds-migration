@@ -50,7 +50,9 @@ impl BasicHome {
                 let error = self.error.clone();
                 tokio::spawn(async move {
                     match export_repo(pds_session).await {
-                        Ok(_) => {}
+                        Ok(_) => {
+                            tracing::info!("Repo exported successfully");
+                        }
                         Err(e) => {
                             let mut error = error.write().await;
                             error.push(e);
