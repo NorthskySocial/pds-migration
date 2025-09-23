@@ -26,10 +26,6 @@ use sha2::{Digest, Sha256};
 use std::io::Write;
 use std::sync::Arc;
 use std::time::SystemTime;
-use tracing::Level;
-use tracing_subscriber::filter;
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
 use zip::write::SimpleFileOptions;
 use zip::{AesMode, ZipWriter};
 
@@ -38,6 +34,7 @@ pub mod app;
 pub mod error_window;
 pub mod errors;
 pub mod ipld;
+pub mod log_viewer;
 pub mod screens;
 pub mod session;
 pub mod styles;
@@ -821,14 +818,6 @@ pub fn run() -> eframe::Result {
     use std::time::Duration;
     use tokio::runtime::Runtime;
 
-    let filter = filter::Targets::new().with_target("pdsmigration", Level::INFO);
-
-    let collector = egui_tracing::EventCollector::default();
-    tracing_subscriber::registry()
-        .with(collector.clone())
-        .with(filter)
-        .init();
-
     let rt = Runtime::new().expect("Unable to create Runtime");
 
     // Enter the runtime so that `tokio::spawn` is available immediately.
@@ -864,7 +853,7 @@ pub fn run() -> eframe::Result {
         Box::new(|cc| {
             egui_extras::install_image_loaders(&cc.egui_ctx);
             styles::setup_fonts(&cc.egui_ctx);
-            Ok(Box::new(PdsMigrationApp::new(cc, collector)))
+            Ok(Box::new(PdsMigrationApp::new(cc)))
         }),
     )
 }

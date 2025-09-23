@@ -153,6 +153,7 @@ pub async fn export_pds_api(req: ExportPDSRequest) -> Result<(), PdsError> {
                 let chunk = chunk.unwrap();
                 file.write_all(&chunk).await.unwrap();
             }
+            file.flush().await.unwrap();
             return Ok(());
         }
         Err(e) => {
