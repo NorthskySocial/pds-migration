@@ -144,7 +144,7 @@ pub async fn export_pds_api(req: ExportPDSRequest) -> Result<(), PdsError> {
     };
     match download_repo(agent.get_endpoint().await.as_str(), &get_repo_request).await {
         Ok(mut stream) => {
-            tracing::info!("Successfully downloaded repo");
+            tracing::info!("Started downloading repo");
             let mut path = std::env::current_dir().unwrap();
             path.push(session.did.clone().replace(":", "-") + ".car");
             let mut file = tokio::fs::File::create(path.as_path()).await.unwrap();
