@@ -38,7 +38,7 @@
 //         }
 //     }
 //
-//     pub fn show_logged_in(&mut self, _ui: &mut Ui,_ ctx: &Context) {
+//     pub fn show_logged_in(&mut self, ui: &mut Ui, ctx: &Context) {
 //         // ui.vertical_centered(|ui| {
 //         //     ui.horizontal(|ui| {
 //         //         if self.pds_selected {
@@ -75,22 +75,22 @@
 //         //         );
 //         //         styles::render_input(ui, "Password", &mut self.new_password, true, None);
 //         //         ui.horizontal_wrapped(|ui| {
-//         //             // ui.spacing_mut().item_spacing.x = 0.0;
-//         //             // ui.label("By creating an account you agree to the ");
-//         //             //
-//         //             // if !terms_of_service.is_empty() {
-//         //             //     ui.hyperlink_to("Terms of Service", terms_of_service);
-//         //             //     if !privacy_policy.is_empty() {
-//         //             //         ui.label(" and ");
-//         //             //         ui.hyperlink_to("Privacy Policy", privacy_policy);
-//         //             //         ui.label(".");
-//         //             //     } else {
-//         //             //         ui.label(".");
-//         //             //     }
-//         //             // } else {
-//         //             //     // ui.hyperlink_to("Privacy Policy", privacy_policy);
-//         //             //     ui.label(".");
-//         //             // }
+//         //             ui.spacing_mut().item_spacing.x = 0.0;
+//         //             ui.label("By creating an account you agree to the ");
+//         //
+//         //             if !terms_of_service.is_empty() {
+//         //                 ui.hyperlink_to("Terms of Service", terms_of_service);
+//         //                 if !privacy_policy.is_empty() {
+//         //                     ui.label(" and ");
+//         //                     ui.hyperlink_to("Privacy Policy", privacy_policy);
+//         //                     ui.label(".");
+//         //                 } else {
+//         //                     ui.label(".");
+//         //                 }
+//         //             } else {
+//         //                 // ui.hyperlink_to("Privacy Policy", privacy_policy);
+//         //                 ui.label(".");
+//         //             }
 //         //         });
 //         //         styles::render_button(ui, ctx, "Update", || {
 //         //             //todo
@@ -99,7 +99,7 @@
 //         // });
 //     }
 //
-//     pub fn show_logged_out(&mut self, _ui: &mut Ui,_ ctx: &Context) {
+//     pub fn show_logged_out(&mut self, ui: &mut Ui, ctx: &Context) {
 //         // ui.vertical_centered(|ui| {
 //         //     ui.horizontal(|ui| {
 //         //         todo!();
@@ -121,7 +121,7 @@
 //     }
 //
 //     fn name(&self) -> ScreenType {
-//         ScreenType::MigrateWithoutPds
+//         ScreenType::EditPLC
 //     }
 // }
 //

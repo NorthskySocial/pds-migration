@@ -193,10 +193,10 @@
 //         styles::render_subtitle(ui, ctx, "Migration Step 2!");
 //         ui.vertical_centered(|ui| {
 //             styles::render_input(ui, "Enter your DID", &mut self.did, true, None);
-//             // styles::render_button(ui, ctx, "Select your repo", || {
-//             //     self.repo_file_dialog.pick_file();
-//             // });
-//             // ui.label(format!("Picked file: {:?}", self.picked_repo_file));
+//             styles::render_button(ui, ctx, "Select your repo", || {
+//                 self.repo_file_dialog.pick_file();
+//             });
+//             ui.label(format!("Picked file: {:?}", self.picked_repo_file));
 //
 //             if let Some(path) = self.repo_file_dialog.take_picked() {
 //                 self.picked_repo_file = Some(path.to_path_buf());

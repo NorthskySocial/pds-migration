@@ -77,16 +77,6 @@ impl BasicHome {
                     }
                 });
             });
-            // styles::render_button(ui, ctx, "Advanced Tools", || {
-            //     let pds_migration_step = self.pds_migration_step.clone();
-            //     let page_lock = self.page.clone();
-            //     tokio::spawn(async move {
-            //         let mut pds_migration_step = pds_migration_step.write().await;
-            //         *pds_migration_step = true;
-            //         let mut page = page_lock.write().await;
-            //         *page = ScreenType::MigrateWithoutPds;
-            //     });
-            // });
         });
     }
 
