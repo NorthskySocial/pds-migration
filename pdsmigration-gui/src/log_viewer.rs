@@ -1,4 +1,5 @@
 use eframe::egui::{self, Color32, RichText, ScrollArea, Ui};
+use egui_file_dialog::FileDialog;
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
@@ -56,7 +57,7 @@ impl Default for LogBuffer {
     fn default() -> Self {
         Self {
             entries: Arc::new(Mutex::new(VecDeque::new())),
-            max_entries: 1000,
+            max_entries: 100000,
         }
     }
 }
@@ -100,6 +101,44 @@ impl LogBuffer {
             entries.clear();
         }
     }
+
+    /// Exports all log entries to a text file at the specified path.
+    /// Returns Ok(()) on success, or an error if the file couldn't be created or written.
+    pub fn export_to_file(&self, path: &str) -> Result<(), std::io::Error> {
+        use std::fs::File;
+        use std::io::Write;
+
+        let mut file = File::create(path)?;
+
+        if let Ok(entries) = self.entries.lock() {
+            for entry in entries.iter() {
+                // Format timestamp
+                let time_since_epoch = entry
+                    .timestamp
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .unwrap_or_default();
+                let secs = time_since_epoch.as_secs();
+                let millis = time_since_epoch.subsec_millis();
+
+                let hours = (secs / 3600) % 24;
+                let minutes = (secs / 60) % 60;
+                let seconds = secs % 60;
+
+                let timestamp = format!("{:02}:{:02}:{:02}.{:03}", hours, minutes, seconds, millis);
+
+                // Write formatted log entry to file
+                writeln!(
+                    file,
+                    "{} {} {}",
+                    timestamp,
+                    entry.level_prefix(),
+                    entry.message
+                )?;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 pub struct LogViewer {
@@ -110,6 +149,7 @@ pub struct LogViewer {
     show_error: bool,
     filter_text: String,
     auto_scroll: bool,
+    _export_dialog: Option<FileDialog>,
 }
 
 impl Default for LogViewer {
@@ -122,6 +162,7 @@ impl Default for LogViewer {
             show_error: true,
             filter_text: String::new(),
             auto_scroll: true,
+            _export_dialog: None,
         }
     }
 }
@@ -136,6 +177,7 @@ impl LogViewer {
             show_error: true,
             filter_text: String::new(),
             auto_scroll: true,
+            _export_dialog: None,
         }
     }
 
@@ -157,10 +199,32 @@ impl LogViewer {
 
                 ui.separator();
                 ui.label("Filter:");
-                if ui.button("Export").clicked() {
-                    self.buffer.clear();
-                }
+
                 ui.text_edit_singleline(&mut self.filter_text);
+                ui.separator();
+                if ui.button("Export").clicked() {
+                    // Open a file dialog to let the user choose where to save the log file
+                    let path = rfd::FileDialog::new()
+                        .set_title("Save Log File")
+                        .set_file_name("log.txt")
+                        .set_directory(".")
+                        .add_filter("Text Files", &["txt"])
+                        .save_file();
+
+                    if let Some(path) = path {
+                        if let Err(e) = self
+                            .buffer
+                            .export_to_file(path.to_str().unwrap_or("log.txt"))
+                        {
+                            // Log an error if the export fails
+                            self.buffer.error(format!("Failed to export log: {}", e));
+                        } else {
+                            // Log success
+                            self.buffer
+                                .info(format!("Log exported to {}", path.display()));
+                        }
+                    }
+                }
             });
 
             // Log entries section

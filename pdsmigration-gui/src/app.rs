@@ -268,6 +268,17 @@ impl PdsMigrationApp {
                 self.error.clone(),
                 self.page.clone(),
             )),
+            // ScreenType::EditPLC => Box::new(screens::edit_plc::EditPlc::new(
+            //     self.pds_session.clone(),
+            //     self.error.clone(),
+            //     self.page.clone(),
+            // )),
+            // ScreenType::MigrateWithoutPds => {
+            //     Box::new(screens::migrate_without_pds::MigrateWithoutPds::new(
+            //         self.error.clone(),
+            //         self.page.clone(),
+            //     ))
+            // }
         };
 
         // Reassign the current_screen
