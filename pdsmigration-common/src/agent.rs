@@ -574,6 +574,7 @@ pub async fn download_repo(
                 .parse::<i32>()
                 .unwrap_or(1000);
             if ratelimit_remaining < 100 {
+                tracing::error!("Ratelimit reached");
                 return Err(PdsError::RateLimitReached);
             }
 
