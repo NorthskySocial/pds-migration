@@ -324,7 +324,7 @@ pub async fn account_import(agent: &BskyAgent, filepath: &str) -> Result<(), Pds
             Ok(())
         }
         Err(e) => {
-            tracing::error!("Error importing: {:?}", e);
+            tracing::error!("Error importing: {:?}", e.to_string());
             Err(PdsError::AccountImport)
         }
     }
@@ -580,7 +580,7 @@ pub async fn download_repo(
 
             match output.status() {
                 reqwest::StatusCode::OK => {
-                    tracing::info!("Successfully downloaded Repo");
+                    tracing::info!("Started downloading Repo");
                     Ok(output.bytes_stream())
                 }
                 _ => {

@@ -9,7 +9,7 @@ use tokio::sync::RwLock;
 pub struct ExportRepo {
     pds_session: Arc<RwLock<PdsSession>>,
     error: Arc<RwLock<Vec<GuiError>>>,
-    task_started: Arc<RwLock<bool>>,
+    task_started: bool,
     page: Arc<RwLock<ScreenType>>,
 }
 
@@ -19,11 +19,10 @@ impl ExportRepo {
         error: Arc<RwLock<Vec<GuiError>>>,
         page: Arc<RwLock<ScreenType>>,
     ) -> Self {
-        let task_started = Arc::new(RwLock::new(false));
         Self {
             pds_session,
             error,
-            task_started,
+            task_started: false,
             page,
         }
     }
@@ -32,11 +31,10 @@ impl ExportRepo {
 impl Screen for ExportRepo {
     fn ui(&mut self, ui: &mut Ui, ctx: &egui::Context) {
         styles::render_subtitle(ui, ctx, "Exporting Repo from old PDS");
-        let task_started = self.task_started.blocking_read();
-        if *task_started {
+        if self.task_started {
             return;
         }
-        drop(task_started);
+        self.task_started = true;
 
         let pds_session = {
             let lock = self.pds_session.clone();
@@ -45,12 +43,8 @@ impl Screen for ExportRepo {
         };
         let error = self.error.clone();
         let page = self.page.clone();
-        let task_writer = self.task_started.clone();
         tokio::spawn(async move {
             tracing::info!("Exporting repo from old PDS");
-            let mut writer = task_writer.write().await;
-            *writer = true;
-            drop(writer);
             match export_repo(pds_session).await {
                 Ok(_) => {
                     tracing::info!("Repo exported successfully");
