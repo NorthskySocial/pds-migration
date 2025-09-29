@@ -1,7 +1,7 @@
 use crate::errors::PdsError;
 use crate::{CreateAccountRequest, CreateAccountWithoutPDSRequest, GetBlobRequest, GetRepoRequest};
 use bsky_sdk::api::agent::atp_agent::AtpSession;
-use bsky_sdk::api::agent::{Configure};
+use bsky_sdk::api::agent::Configure;
 use bsky_sdk::api::app::bsky::actor::defs::Preferences;
 use bsky_sdk::api::com::atproto::identity::sign_plc_operation::InputData;
 use bsky_sdk::api::com::atproto::repo::list_missing_blobs::RecordBlob;
@@ -564,16 +564,13 @@ pub async fn download_repo(
         .await;
     match result {
         Ok(output) => {
-            let ratelimit_remaining = match output
-                .headers()
-                .get("ratelimit-remaining"){
+            let ratelimit_remaining = match output.headers().get("ratelimit-remaining") {
                 None => 1000,
-                Some(rate_limit_remaining) =>
-                    rate_limit_remaining.to_str()
-                        .unwrap_or("1000")
-                        .parse::<i32>()
-                        .unwrap_or(1000)
-
+                Some(rate_limit_remaining) => rate_limit_remaining
+                    .to_str()
+                    .unwrap_or("1000")
+                    .parse::<i32>()
+                    .unwrap_or(1000),
             };
             if ratelimit_remaining < 100 {
                 tracing::error!("Ratelimit reached");
