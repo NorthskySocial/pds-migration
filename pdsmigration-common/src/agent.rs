@@ -1,7 +1,7 @@
 use crate::errors::PdsError;
 use crate::{CreateAccountRequest, CreateAccountWithoutPDSRequest, GetBlobRequest, GetRepoRequest};
 use bsky_sdk::api::agent::atp_agent::AtpSession;
-use bsky_sdk::api::agent::Configure;
+use bsky_sdk::api::agent::{Configure};
 use bsky_sdk::api::app::bsky::actor::defs::Preferences;
 use bsky_sdk::api::com::atproto::identity::sign_plc_operation::InputData;
 use bsky_sdk::api::com::atproto::repo::list_missing_blobs::RecordBlob;
@@ -555,24 +555,26 @@ pub async fn download_repo(
     request: &GetRepoRequest,
 ) -> Result<impl futures_core::Stream<Item = Result<bytes::Bytes, reqwest::Error>>, PdsError> {
     let client = reqwest::Client::new();
+
     let url = format!("{pds_host}/xrpc/com.atproto.sync.getRepo");
     let result = client
         .get(url)
         .query(&[("did", request.did.as_str().to_string())])
-        .header("Content-Type", "application/json")
-        .bearer_auth(request.token.clone())
         .send()
         .await;
     match result {
         Ok(output) => {
-            let ratelimit_remaining = output
+            let ratelimit_remaining = match output
                 .headers()
-                .get("ratelimit-remaining")
-                .unwrap()
-                .to_str()
-                .unwrap_or("1000")
-                .parse::<i32>()
-                .unwrap_or(1000);
+                .get("ratelimit-remaining"){
+                None => 1000,
+                Some(rate_limit_remaining) =>
+                    rate_limit_remaining.to_str()
+                        .unwrap_or("1000")
+                        .parse::<i32>()
+                        .unwrap_or(1000)
+
+            };
             if ratelimit_remaining < 100 {
                 tracing::error!("Ratelimit reached");
                 return Err(PdsError::RateLimitReached);
