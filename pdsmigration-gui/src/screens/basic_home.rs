@@ -38,7 +38,7 @@ impl BasicHome {
                     let mut pds_migration_step = pds_migration_step.write().await;
                     *pds_migration_step = true;
                     let mut page = page_lock.write().await;
-                    *page = ScreenType::DoesAccountExist;
+                    *page = ScreenType::ExportBlobs;
                 });
             });
             styles::render_button(ui, ctx, "Backup Repo", || {

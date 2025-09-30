@@ -243,18 +243,21 @@ pub async fn request_token(session_config: SessionConfig) -> Result<(), GuiError
 pub async fn migrate_preferences(pds_session: PdsSession) -> Result<(), GuiError> {
     let did = match pds_session.did().clone() {
         None => {
+            tracing::error!("No DID found");
             return Err(GuiError::Other);
         }
         Some(did) => did.to_string(),
     };
     let old_session_config = match &pds_session.old_session_config() {
         None => {
+            tracing::error!("No old session config found");
             return Err(GuiError::Other);
         }
         Some(config) => config,
     };
     let new_session_config = match &pds_session.new_session_config() {
         None => {
+            tracing::error!("No new session config found");
             return Err(GuiError::Other);
         }
         Some(config) => config,
@@ -307,18 +310,21 @@ pub async fn migrate_plc_via_pds(
 ) -> Result<(), GuiError> {
     let did = match pds_session.did().clone() {
         None => {
+            tracing::error!("No DID found");
             return Err(GuiError::Other);
         }
         Some(did) => did.to_string(),
     };
     let old_session_config = match &pds_session.old_session_config() {
         None => {
+            tracing::error!("No old session config found");
             return Err(GuiError::Other);
         }
         Some(config) => config,
     };
     let new_session_config = match &pds_session.new_session_config() {
         None => {
+            tracing::error!("No new session config found");
             return Err(GuiError::Other);
         }
         Some(config) => config,
@@ -341,11 +347,11 @@ pub async fn migrate_plc_via_pds(
     match pdsmigration_common::migrate_plc_api(request).await {
         Ok(_) => {
             tracing::info!("Migrating PLC completed");
-            return Ok(());
+            Ok(())
         }
         Err(_pds_error) => {
             tracing::error!("Error migrating PLC: {_pds_error}");
-            return Err(GuiError::Runtime);
+            Err(GuiError::Runtime)
         }
     }
 }
@@ -376,11 +382,11 @@ pub async fn upload_blobs(pds_session: PdsSession) -> Result<(), GuiError> {
     match pdsmigration_common::upload_blobs_api(request).await {
         Ok(_) => {
             tracing::info!("Uploading Blobs completed");
-            return Ok(());
+            Ok(())
         }
         Err(_pds_error) => {
             tracing::error!("Error uploading blobs: {_pds_error}");
-            return Err(GuiError::Runtime);
+            Err(GuiError::Runtime)
         }
     }
 }
@@ -389,12 +395,14 @@ pub async fn upload_blobs(pds_session: PdsSession) -> Result<(), GuiError> {
 pub async fn export_all_blobs(pds_session: PdsSession) -> Result<(), GuiError> {
     let did = match pds_session.did().clone() {
         None => {
+            tracing::error!("No DID found");
             return Err(GuiError::Other);
         }
         Some(did) => did.to_string(),
     };
     let old_session_config = match &pds_session.old_session_config() {
         None => {
+            tracing::error!("No old session config found");
             return Err(GuiError::Other);
         }
         Some(config) => config,
@@ -431,6 +439,7 @@ pub async fn export_all_blobs(pds_session: PdsSession) -> Result<(), GuiError> {
 
 #[tracing::instrument(skip(pds_session))]
 pub async fn export_missing_blobs(pds_session: PdsSession) -> Result<(), GuiError> {
+    tracing::info!("Lib: Exporting Missing Blobs started");
     let did = match pds_session.did().clone() {
         None => {
             tracing::error!("No DID found");
@@ -440,12 +449,14 @@ pub async fn export_missing_blobs(pds_session: PdsSession) -> Result<(), GuiErro
     };
     let old_session_config = match &pds_session.old_session_config() {
         None => {
+            tracing::error!("No old session config found");
             return Err(GuiError::Other);
         }
         Some(config) => config,
     };
     let new_session_config = match &pds_session.new_session_config() {
         None => {
+            tracing::error!("No new session config found");
             return Err(GuiError::Other);
         }
         Some(config) => config,
@@ -466,7 +477,7 @@ pub async fn export_missing_blobs(pds_session: PdsSession) -> Result<(), GuiErro
     match pdsmigration_common::export_blobs_api(request).await {
         Ok(_) => {
             tracing::info!("Exporting Missing Blobs completed");
-            return Ok(());
+            Ok(())
         }
         Err(pds_error) => match pds_error {
             PdsError::Validation => {
@@ -474,11 +485,11 @@ pub async fn export_missing_blobs(pds_session: PdsSession) -> Result<(), GuiErro
                     "Error exporting missing blobs, validation error: {:?}",
                     pds_error
                 );
-                return Err(GuiError::Other);
+                Err(GuiError::Other)
             }
             _ => {
                 tracing::error!("Error exporting missing blobs: {:?}", pds_error);
-                return Err(GuiError::Runtime);
+                Err(GuiError::Runtime)
             }
         },
     }
@@ -512,11 +523,11 @@ pub async fn import_repo(pds_session: PdsSession) -> Result<(), GuiError> {
     match pdsmigration_common::import_pds_api(request).await {
         Ok(_) => {
             tracing::info!("Importing Repo completed");
-            return Ok(());
+            Ok(())
         }
         Err(pds_error) => {
             tracing::error!("Error importing repo: {:?}", pds_error);
-            return Err(GuiError::Runtime);
+            Err(GuiError::Runtime)
         }
     }
 }
@@ -684,7 +695,10 @@ pub async fn create_account(parameters: CreateAccountParameters) -> Result<PdsSe
     let service_token = match pdsmigration_common::get_service_auth_api(service_auth_request).await
     {
         Ok(res) => res,
-        Err(_pds_error) => return Err(GuiError::Runtime),
+        Err(_pds_error) => {
+            tracing::error!("Error getting service auth token");
+            return Err(GuiError::Runtime);
+        }
     };
 
     let create_account_request = CreateAccountApiRequest {
@@ -763,7 +777,10 @@ pub async fn gener(parameters: CreateAccountParameters) -> Result<PdsSession, Gu
     let service_token = match pdsmigration_common::get_service_auth_api(service_auth_request).await
     {
         Ok(res) => res,
-        Err(_pds_error) => return Err(GuiError::Runtime),
+        Err(_pds_error) => {
+            tracing::error!("Error getting service auth token");
+            return Err(GuiError::Runtime);
+        }
     };
 
     let create_account_request = CreateAccountApiRequest {

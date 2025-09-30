@@ -31,6 +31,7 @@ impl ExportBlobs {
     }
 }
 impl Screen for ExportBlobs {
+    #[tracing::instrument(skip(self, ui, ctx))]
     fn ui(&mut self, ui: &mut Ui, ctx: &egui::Context) {
         styles::render_subtitle(ui, ctx, "Exporting blobs from old PDS");
         if self.task_started {
