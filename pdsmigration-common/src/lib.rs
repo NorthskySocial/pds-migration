@@ -240,6 +240,7 @@ pub struct ExportBlobsRequest {
 
 #[tracing::instrument]
 pub async fn export_blobs_api(req: ExportBlobsRequest) -> Result<(), PdsError> {
+    tracing::info!("export_blobs_api started");
     let agent = BskyAgent::builder().build().await.map_err(|error| {
         tracing::error!("{}", error.to_string());
         PdsError::Runtime
@@ -259,10 +260,18 @@ pub async fn export_blobs_api(req: ExportBlobsRequest) -> Result<(), PdsError> {
         req.origin_token.as_str(),
     )
     .await?;
-    let mut path = std::env::current_dir().unwrap();
+    let mut path = match std::env::current_dir() {
+        Ok(path) => path,
+        Err(e) => {
+            tracing::error!("Error getting current directory: {:?}", e);
+            return Err(PdsError::Validation);
+        }
+    };
     path.push(session.did.as_str().replace(":", "-"));
     match tokio::fs::create_dir(path.as_path()).await {
-        Ok(_) => {}
+        Ok(_) => {
+            tracing::info!("Successfully created directory");
+        }
         Err(e) => {
             if e.kind() != ErrorKind::AlreadyExists {
                 tracing::error!("Error creating directory: {:?}", e);
@@ -271,8 +280,21 @@ pub async fn export_blobs_api(req: ExportBlobsRequest) -> Result<(), PdsError> {
         }
     }
     for missing_blob in &missing_blobs {
-        let session = agent.get_session().await.unwrap();
-        let mut filepath = std::env::current_dir().unwrap();
+        tracing::debug!("Missing blob: {:?}", missing_blob);
+        let session = match agent.get_session().await {
+            Some(session) => session,
+            None => {
+                tracing::error!("Failed to get session");
+                return Err(PdsError::Validation);
+            }
+        };
+        let mut filepath = match std::env::current_dir() {
+            Ok(res) => res,
+            Err(e) => {
+                tracing::error!("Error getting current directory: {:?}", e);
+                return Err(PdsError::Validation);
+            }
+        };
         filepath.push(session.did.as_str().replace(":", "-"));
         filepath.push(
             missing_blob
@@ -283,14 +305,14 @@ pub async fn export_blobs_api(req: ExportBlobsRequest) -> Result<(), PdsError> {
                 .unwrap_or("fallback"),
         );
         if !tokio::fs::try_exists(filepath).await.unwrap() {
+            let missing_blob_cid = missing_blob.cid.clone();
             let get_blob_request = GetBlobRequest {
                 did: session.did.clone(),
-                cid: missing_blob
-                    .record_uri
-                    .as_str()
-                    .split("/")
-                    .last()
-                    .unwrap_or("fallback")
+                cid: format!("{missing_blob_cid:?}")
+                    .strip_prefix("Cid(Cid(")
+                    .unwrap()
+                    .strip_suffix("))")
+                    .unwrap()
                     .to_string(),
                 token: session.access_jwt.clone(),
             };
@@ -300,7 +322,7 @@ pub async fn export_blobs_api(req: ExportBlobsRequest) -> Result<(), PdsError> {
                     let mut path = std::env::current_dir().unwrap();
                     path.push(session.did.as_str().replace(":", "-"));
                     path.push(
-                        format!("{missing_blob:?}")
+                        format!("{missing_blob_cid:?}")
                             .strip_prefix("Cid(Cid(")
                             .unwrap()
                             .strip_suffix("))")
@@ -322,6 +344,7 @@ pub async fn export_blobs_api(req: ExportBlobsRequest) -> Result<(), PdsError> {
                             let five_minutes = Duration::from_secs(300);
                             tokio::time::sleep(five_minutes).await;
                         }
+                        PdsError::Validation => {}
                         _ => {
                             tracing::error!("Failed to determine missing blobs");
                             return Err(PdsError::Validation);

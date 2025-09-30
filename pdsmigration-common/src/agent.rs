@@ -499,11 +499,12 @@ pub async fn create_account(
     Ok(())
 }
 
-#[tracing::instrument(skip(request))]
+#[tracing::instrument]
 pub async fn download_blob(
     pds_host: &str,
     request: &GetBlobRequest,
 ) -> Result<impl futures_core::Stream<Item = Result<bytes::Bytes, reqwest::Error>>, PdsError> {
+    tracing::debug!("Downloading blob");
     let client = reqwest::Client::new();
     let url = format!("{pds_host}/xrpc/com.atproto.sync.getBlob");
     let result = client
@@ -521,12 +522,12 @@ pub async fn download_blob(
             let ratelimit_remaining = output
                 .headers()
                 .get("ratelimit-remaining")
-                .unwrap()
-                .to_str()
+                .map(|v| v.to_str().unwrap_or("1000"))
                 .unwrap_or("1000")
                 .parse::<i32>()
                 .unwrap_or(1000);
             if ratelimit_remaining < 100 {
+                tracing::error!("Ratelimit reached");
                 return Err(PdsError::RateLimitReached);
             }
 
@@ -535,15 +536,19 @@ pub async fn download_blob(
                     tracing::info!("Successfully downloaded blob");
                     Ok(output.bytes_stream())
                 }
-                _ => {
-                    tracing::error!("Error downloading blob: {:?}", output);
+                reqwest::StatusCode::BAD_REQUEST => {
+                    tracing::error!("BadRequest Error downloading blob: {:?}", output);
                     Err(PdsError::Validation)
+                }
+                _ => {
+                    tracing::error!("Runtime Error downloading blob: {:?}", output);
+                    Err(PdsError::Runtime)
                 }
             }
         }
         Err(e) => {
-            tracing::error!("Error downloading blob: {:?}", e);
-            Err(PdsError::Validation)
+            tracing::error!("Unexpected Error downloading blob: {:?}", e);
+            Err(PdsError::Runtime)
         }
     }
 }
@@ -559,6 +564,8 @@ pub async fn download_repo(
     let result = client
         .get(url)
         .query(&[("did", request.did.as_str().to_string())])
+        .header("Content-Type", "application/json")
+        .bearer_auth(request.token.clone())
         .send()
         .await;
     match result {
