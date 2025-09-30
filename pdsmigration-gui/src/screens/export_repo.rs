@@ -35,11 +35,19 @@ impl Screen for ExportRepo {
             return;
         }
         self.task_started = true;
+        tracing::debug!("Starting task to export repo from old PDS");
 
         let pds_session = {
             let lock = self.pds_session.clone();
-            let value = lock.blocking_read();
-            value.clone()
+            let value = lock.try_read();
+            match value {
+                Ok(value) => value.clone(),
+                Err(_) => {
+                    tracing::debug!("Unable to read pds session");
+                    self.task_started = false;
+                    return;
+                }
+            }
         };
         let error = self.error.clone();
         let page = self.page.clone();
@@ -52,6 +60,7 @@ impl Screen for ExportRepo {
                     *page = ScreenType::ExportBlobs;
                 }
                 Err(e) => {
+                    tracing::error!("Error exporting repo from old PDS: {}", e);
                     let mut errors = error.write().await;
                     errors.push(e);
                 }

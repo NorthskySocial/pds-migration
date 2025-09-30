@@ -144,6 +144,7 @@ impl MigratePLC {
                     *page_write = ScreenType::ActiveAccounts;
                 }
                 Err(e) => {
+                    tracing::error!("Error updating PLC Directory: {}", e);
                     let mut error_write = error.write().await;
                     error_write.push(e);
                 }

@@ -50,6 +50,7 @@ impl Screen for ImportRepo {
                     *page = ScreenType::ImportBlobs;
                 }
                 Err(e) => {
+                    tracing::error!("Error importing repo to new PDS: {}", e);
                     let mut errors = error.write().await;
                     errors.push(e);
                 }

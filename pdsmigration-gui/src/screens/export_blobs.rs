@@ -32,21 +32,36 @@ impl ExportBlobs {
 }
 impl Screen for ExportBlobs {
     fn ui(&mut self, ui: &mut Ui, ctx: &egui::Context) {
-        styles::render_subtitle(ui, ctx, "Exportings blobs from old PDS");
+        styles::render_subtitle(ui, ctx, "Exporting blobs from old PDS");
         if self.task_started {
             return;
         }
         self.task_started = true;
+
         let pds_session = {
             let lock = self.pds_session.clone();
-            let value = lock.blocking_read();
-            value.clone()
+            let value = lock.try_read();
+            match value {
+                Ok(value) => value.clone(),
+                Err(_) => {
+                    tracing::debug!("Unable to read pds session");
+                    self.task_started = false;
+                    return;
+                }
+            }
         };
         let error = self.error.clone();
         let pds_migration_step = {
             let lock = self.pds_migration_step.clone();
-            let value = lock.blocking_read();
-            *value
+            let value = lock.try_read();
+            match value {
+                Ok(value) => *value,
+                Err(_) => {
+                    tracing::debug!("Unable to read pds migration step");
+                    self.task_started = false;
+                    return;
+                }
+            }
         };
         let page = self.page.clone();
         tokio::spawn(async move {
