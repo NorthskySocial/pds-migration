@@ -669,6 +669,7 @@ pub struct CreateAccountParameters {
 
 #[tracing::instrument(skip(parameters))]
 pub async fn create_account(parameters: CreateAccountParameters) -> Result<PdsSession, GuiError> {
+    tracing::info!("Creating Account started");
     let mut pds_session = parameters.pds_session.clone();
     let old_session_config = match &pds_session.old_session_config() {
         None => return Err(GuiError::Other),

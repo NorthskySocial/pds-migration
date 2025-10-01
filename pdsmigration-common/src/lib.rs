@@ -31,7 +31,9 @@ pub struct ServiceAuthResponse {
     pub token: String,
 }
 
+#[tracing::instrument(skip(req))]
 pub async fn get_service_auth_api(req: ServiceAuthRequest) -> Result<String, PdsError> {
+    tracing::info!("get_service_auth_api started");
     let agent = BskyAgent::builder().build().await.unwrap();
     login_helper(
         &agent,
@@ -99,6 +101,8 @@ pub struct GetRepoRequest {
 
 #[tracing::instrument(skip(req))]
 pub async fn create_account_api(req: CreateAccountApiRequest) -> Result<(), PdsError> {
+    tracing::info!("create_account_api started");
+    tracing::info!("{:?}", req);
     create_account(
         req.pds_host.as_str(),
         &CreateAccountRequest {
