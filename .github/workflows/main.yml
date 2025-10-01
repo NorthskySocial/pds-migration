@@ -4,7 +4,6 @@ on:
   push:
     branches: [ main ]
   pull_request:
-
 jobs:
   check:
     name: Check
@@ -114,6 +113,9 @@ jobs:
           - os: ubuntu-latest
             TARGET: x86_64-unknown-linux-gnu
 
+          - os: ubuntu-latest
+            TARGET: x86_64-unknown-linux-musl
+
           - os: windows-latest
             TARGET: x86_64-pc-windows-msvc
             EXTENSION: .exe
@@ -123,6 +125,8 @@ jobs:
         run: echo "${{ matrix.TARGET }}"
 
       - uses: actions/checkout@master
+      - name: Install OpenSSL
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev
       - name: Install build dependencies - Rustup
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain stable --profile default --target ${{ matrix.TARGET }} -y
