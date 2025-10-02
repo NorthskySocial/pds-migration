@@ -1,3 +1,3 @@
 [toolchain]
-channel = "1.90.0"
+channel = "nightly-x86_64-apple-darwin"
 components = ["rustfmt", "clippy"]

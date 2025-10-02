@@ -474,12 +474,16 @@ pub async fn create_account(
         extra_data: Ipld::Null,
     })
     .unwrap();
-    let result = client
+    let mut request_builder = client
         .post(pds_host.to_string() + "/xrpc/com.atproto.server.createAccount")
         .body(x)
-        .header("Content-Type", "application/json")
-        .send()
-        .await;
+        .header("Content-Type", "application/json");
+
+    if let Some(token) = &account_request.token {
+        request_builder = request_builder.bearer_auth(token);
+    }
+
+    let result = request_builder.send().await;
     match result {
         Ok(output) => match output.status() {
             reqwest::StatusCode::OK => {
