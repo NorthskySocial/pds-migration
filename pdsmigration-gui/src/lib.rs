@@ -705,7 +705,7 @@ pub async fn create_account(parameters: CreateAccountParameters) -> Result<PdsSe
     let create_account_request = CreateAccountApiRequest {
         email,
         handle: handle.clone(),
-        invite_code: invite_code.trim().to_string(),
+        invite_code,
         password: password.clone(),
         token: service_token,
         pds_host: new_pds_host.clone(),
