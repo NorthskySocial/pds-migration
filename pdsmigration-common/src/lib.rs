@@ -109,7 +109,7 @@ pub async fn create_account_api(req: CreateAccountApiRequest) -> Result<(), PdsE
             did: req.did.parse().unwrap(),
             email: Some(req.email.clone()),
             handle: req.handle.parse().unwrap(),
-            invite_code: Some(req.invite_code.clone()),
+            invite_code: Some(req.invite_code.trim().to_string()),
             password: Some(req.password.clone()),
             recovery_key: req.recovery_key.clone(),
             verification_code: Some(String::from("")),
