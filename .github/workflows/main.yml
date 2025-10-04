@@ -3,7 +3,6 @@ name: Build
 on:
   push:
     branches: [ main ]
-  pull_request:
 jobs:
   check:
     name: Check
