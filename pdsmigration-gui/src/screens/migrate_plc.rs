@@ -67,6 +67,11 @@ impl MigratePLC {
         styles::render_subtitle(ui, ctx, "Create Recovery Key");
         ui.horizontal(|ui| {
             styles::render_button(ui, ctx, "Generate Recovery Key", || {
+                if self.user_recovery_key_password.is_empty() {
+                    tracing::error!("User Recovery Key Password is empty");
+                    return;
+                }
+
                 let user_recovery_key_password = self.user_recovery_key_password.clone();
                 let generated_user_recovery_key = self.generated_user_recovery_key.clone();
                 let error_lock = self.error.clone();
@@ -86,7 +91,7 @@ impl MigratePLC {
             });
             styles::render_input(
                 ui,
-                "Password",
+                "Archive Password",
                 &mut self.user_recovery_key_password,
                 true,
                 Some(""),
@@ -111,13 +116,22 @@ impl MigratePLC {
                     }
                 }
                 ui.vertical(|ui| {
-                    ui.label("User Recovery Key (optional)");
+                    ui.label("User Recovery Key");
                     ui.text_edit_singleline(&mut self.user_recovery_key);
                 });
             });
         });
         ui.horizontal(|ui| {
             styles::render_button(ui, ctx, "Submit", || {
+                if self.plc_token.is_empty() {
+                    tracing::error!("PLC Signing Token is empty");
+                    return;
+                }
+                if self.user_recovery_key.is_empty() {
+                    tracing::error!("User Recovery Key is empty");
+                    return;
+                }
+
                 self.task_started = true;
                 self.start_migration();
             });
