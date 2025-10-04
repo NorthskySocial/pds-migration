@@ -136,7 +136,7 @@ impl PdsMigrationApp {
                 // Push a spacer at the bottom to demonstrate vertical spacing
                 ui.with_layout(Layout::bottom_up(Align::Center), |ui| {
                     ui.horizontal(|ui| {
-                        ui.label("v1.0.0");
+                        ui.label(concat!("v", env!("CARGO_PKG_VERSION")));
                         ui.add_space(10.0);
                     });
                     ui.horizontal(|ui| {
