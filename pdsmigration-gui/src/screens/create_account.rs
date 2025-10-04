@@ -187,13 +187,20 @@ impl Screen for CreateAccount {
                     true,
                     None,
                 );
-                styles::render_input(
-                    ui,
-                    "Invite Code (Leave Blank if None)",
-                    &mut self.invite_code,
-                    false,
-                    None,
-                );
+                let invite_code_required = {
+                    let invite_code_required_lock = self.invite_code_required.clone();
+                    let value = invite_code_required_lock.blocking_read();
+                    *value
+                };
+                if invite_code_required {
+                    styles::render_input(
+                        ui,
+                        "Invite Code (Leave Blank if None)",
+                        &mut self.invite_code,
+                        false,
+                        None,
+                    );
+                }
 
                 let privacy_policy = {
                     let privacy_policy = self.privacy_policy_lock.blocking_read();
@@ -230,6 +237,36 @@ impl Screen for CreateAccount {
                         tracing::error!("Passwords do not match");
                         return;
                     }
+                    if self.new_password.is_empty() {
+                        tracing::error!("Password is empty");
+                        return;
+                    }
+                    if self.new_handle.is_empty() {
+                        tracing::error!("Handle is empty");
+                    }
+                    if self.new_email.is_empty() {
+                        tracing::error!("Email is empty");
+                        return;
+                    }
+                    if self.new_pds_host.is_empty() {
+                        tracing::error!("PDS Host is empty");
+                        return;
+                    }
+                    if self.invite_code.is_empty() {
+                        tracing::error!("Invite Code is empty");
+                        return;
+                    }
+
+                    let invite_code_required = {
+                        let invite_code_required_lock = self.invite_code_required.clone();
+                        let value = invite_code_required_lock.blocking_read();
+                        *value
+                    };
+                    if invite_code_required && self.invite_code.is_empty() {
+                        tracing::error!("Invite Code is empty");
+                        return;
+                    }
+
                     self.submit();
                 });
             }
