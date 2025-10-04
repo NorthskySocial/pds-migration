@@ -180,7 +180,13 @@ impl Screen for CreateAccount {
                     "If not using a custom domain, please append with {available_user_domains}"
                 ));
                 styles::render_input(ui, "Password", &mut self.new_password, true, None);
-                styles::render_input(ui, "Password", &mut self.confirm_password, true, None);
+                styles::render_input(
+                    ui,
+                    "Confirm Password",
+                    &mut self.confirm_password,
+                    true,
+                    None,
+                );
                 styles::render_input(
                     ui,
                     "Invite Code (Leave Blank if None)",
@@ -220,6 +226,10 @@ impl Screen for CreateAccount {
                     });
                 }
                 styles::render_button(ui, ctx, "Submit", || {
+                    if self.new_password != self.confirm_password {
+                        tracing::error!("Passwords do not match");
+                        return;
+                    }
                     self.submit();
                 });
             }
