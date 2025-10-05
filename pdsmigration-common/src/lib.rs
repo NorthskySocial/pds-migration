@@ -34,7 +34,10 @@ pub struct ServiceAuthResponse {
 #[tracing::instrument(skip(req))]
 pub async fn get_service_auth_api(req: ServiceAuthRequest) -> Result<String, PdsError> {
     tracing::info!("get_service_auth_api started");
-    let agent = BskyAgent::builder().build().await.unwrap();
+    let agent = BskyAgent::builder().build().await.map_err(|error| {
+        tracing::error!("Failed to build BskyAgent: {}", error);
+        PdsError::Runtime
+    })?;
     login_helper(
         &agent,
         req.pds_host.as_str(),
@@ -43,6 +46,7 @@ pub async fn get_service_auth_api(req: ServiceAuthRequest) -> Result<String, Pds
     )
     .await?;
     let token = get_service_auth(&agent, req.aud.as_str()).await?;
+    tracing::info!("Successfully obtained service auth token");
     Ok(token)
 }
 
@@ -103,12 +107,23 @@ pub struct GetRepoRequest {
 pub async fn create_account_api(req: CreateAccountApiRequest) -> Result<(), PdsError> {
     tracing::info!("create_account_api started");
     tracing::info!("{:?}", req);
+
+    let did = req.did.parse().map_err(|error| {
+        tracing::error!("Failed to parse DID '{}': {}", req.did, error);
+        PdsError::Validation
+    })?;
+
+    let handle = req.handle.parse().map_err(|error| {
+        tracing::error!("Failed to parse handle '{}': {}", req.handle, error);
+        PdsError::Validation
+    })?;
+
     create_account(
         req.pds_host.as_str(),
         &CreateAccountRequest {
-            did: req.did.parse().unwrap(),
+            did,
             email: Some(req.email.clone()),
-            handle: req.handle.parse().unwrap(),
+            handle,
             invite_code: Some(req.invite_code.trim().to_string()),
             password: Some(req.password.clone()),
             recovery_key: req.recovery_key.clone(),
@@ -119,6 +134,7 @@ pub async fn create_account_api(req: CreateAccountApiRequest) -> Result<(), PdsE
         },
     )
     .await?;
+    tracing::info!("create_account_api completed successfully");
     Ok(())
 }
 
@@ -149,15 +165,35 @@ pub async fn export_pds_api(req: ExportPDSRequest) -> Result<(), PdsError> {
     match download_repo(agent.get_endpoint().await.as_str(), &get_repo_request).await {
         Ok(mut stream) => {
             tracing::info!("Started downloading repo");
-            let mut path = std::env::current_dir().unwrap();
+            let mut path = std::env::current_dir().map_err(|error| {
+                tracing::error!("Failed to get current directory: {}", error);
+                PdsError::Runtime
+            })?;
             path.push(session.did.clone().replace(":", "-") + ".car");
-            let mut file = tokio::fs::File::create(path.as_path()).await.unwrap();
+            tracing::info!("Creating repository file: {}", path.display());
+
+            let mut file = tokio::fs::File::create(path.as_path())
+                .await
+                .map_err(|error| {
+                    tracing::error!("Failed to create file {}: {}", path.display(), error);
+                    PdsError::Runtime
+                })?;
 
             while let Some(chunk) = stream.next().await {
-                let chunk = chunk.unwrap();
-                file.write_all(&chunk).await.unwrap();
+                let chunk = chunk.map_err(|error| {
+                    tracing::error!("Error reading stream chunk: {:?}", error);
+                    PdsError::Runtime
+                })?;
+                file.write_all(&chunk).await.map_err(|error| {
+                    tracing::error!("Failed to write chunk to file: {}", error);
+                    PdsError::Runtime
+                })?;
             }
-            file.flush().await.unwrap();
+            file.flush().await.map_err(|error| {
+                tracing::error!("Failed to flush file: {}", error);
+                PdsError::Runtime
+            })?;
+            tracing::info!("Successfully exported repository to {}", path.display());
             return Ok(());
         }
         Err(e) => {
@@ -215,7 +251,11 @@ pub struct MissingBlobsRequest {
 
 #[tracing::instrument]
 pub async fn missing_blobs_api(req: MissingBlobsRequest) -> Result<String, PdsError> {
-    let agent = BskyAgent::builder().build().await.unwrap();
+    tracing::info!("missing_blobs_api started");
+    let agent = BskyAgent::builder().build().await.map_err(|error| {
+        tracing::error!("Failed to build BskyAgent: {}", error);
+        PdsError::Runtime
+    })?;
     login_helper(
         &agent,
         req.pds_host.as_str(),
@@ -228,8 +268,12 @@ pub async fn missing_blobs_api(req: MissingBlobsRequest) -> Result<String, PdsEr
     for blob in &initial_missing_blobs {
         missing_blob_cids.push(format!("{:?}", blob.cid));
     }
+    tracing::info!("Found {} missing blobs", missing_blob_cids.len());
 
-    let response = serde_json::to_string(&missing_blob_cids).unwrap();
+    let response = serde_json::to_string(&missing_blob_cids).map_err(|error| {
+        tracing::error!("Failed to serialize missing blob CIDs: {}", error);
+        PdsError::Runtime
+    })?;
     Ok(response)
 }
 
@@ -741,5 +785,218 @@ mod tests {
         assert_eq!(wrapped[0], 0xe7);
         // Varint encoding of 0xe7 takes 2 bytes since 0xe7 > 127
         assert_eq!(wrapped.len(), 2);
+    }
+
+    #[test]
+    fn test_service_auth_request_serialization() {
+        let request = ServiceAuthRequest {
+            pds_host: "https://example.com".to_string(),
+            aud: "https://audience.com".to_string(),
+            did: "did:plc:test123".to_string(),
+            token: "auth_token_123".to_string(),
+        };
+
+        let json = serde_json::to_string(&request).unwrap();
+        assert!(json.contains("https://example.com"));
+        assert!(json.contains("https://audience.com"));
+        assert!(json.contains("did:plc:test123"));
+        assert!(json.contains("auth_token_123"));
+
+        let deserialized: ServiceAuthRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.pds_host, "https://example.com");
+        assert_eq!(deserialized.aud, "https://audience.com");
+        assert_eq!(deserialized.did, "did:plc:test123");
+        assert_eq!(deserialized.token, "auth_token_123");
+    }
+
+    #[test]
+    fn test_service_auth_response_serialization() {
+        let response = ServiceAuthResponse {
+            token: "response_token_456".to_string(),
+        };
+
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("response_token_456"));
+
+        let deserialized: ServiceAuthResponse = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.token, "response_token_456");
+    }
+
+    #[test]
+    fn test_create_account_api_request_serialization() {
+        let request = CreateAccountApiRequest {
+            email: "test@example.com".to_string(),
+            handle: "test.handle".to_string(),
+            invite_code: "invite123".to_string(),
+            password: "password123".to_string(),
+            token: "token123".to_string(),
+            pds_host: "https://pds.example.com".to_string(),
+            did: "did:plc:test123".to_string(),
+            recovery_key: Some("recovery_key_123".to_string()),
+        };
+
+        let json = serde_json::to_string(&request).unwrap();
+        assert!(json.contains("test@example.com"));
+        assert!(json.contains("test.handle"));
+        assert!(json.contains("https://pds.example.com"));
+
+        let deserialized: CreateAccountApiRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.email, "test@example.com");
+        assert_eq!(deserialized.handle, "test.handle");
+        assert_eq!(
+            deserialized.recovery_key,
+            Some("recovery_key_123".to_string())
+        );
+    }
+
+    #[test]
+    fn test_get_blob_request_serialization() {
+        use bsky_sdk::api::types::string::Did;
+
+        let did_str = "did:plc:test123";
+        let did: Did = did_str.parse().unwrap();
+
+        let request = GetBlobRequest {
+            did: did.clone(),
+            cid: "bafytest123".to_string(),
+            token: "blob_token_789".to_string(),
+        };
+
+        let json = serde_json::to_string(&request).unwrap();
+        assert!(json.contains("bafytest123"));
+        assert!(json.contains("blob_token_789"));
+
+        let deserialized: GetBlobRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.did, did);
+        assert_eq!(deserialized.cid, "bafytest123");
+        assert_eq!(deserialized.token, "blob_token_789");
+    }
+
+    #[test]
+    fn test_get_repo_request_serialization() {
+        use bsky_sdk::api::types::string::Did;
+
+        let did_str = "did:plc:test123";
+        let did: Did = did_str.parse().unwrap();
+
+        let request = GetRepoRequest {
+            did: did.clone(),
+            token: "repo_token_101".to_string(),
+        };
+
+        let json = serde_json::to_string(&request).unwrap();
+        assert!(json.contains("repo_token_101"));
+
+        let deserialized: GetRepoRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.did, did);
+        assert_eq!(deserialized.token, "repo_token_101");
+    }
+
+    #[test]
+    fn test_export_pds_request_serialization() {
+        let request = ExportPDSRequest {
+            pds_host: "https://origin.example.com".to_string(),
+            did: "did:plc:test123".to_string(),
+            token: "export_token_202".to_string(),
+        };
+
+        let json = serde_json::to_string(&request).unwrap();
+        assert!(json.contains("https://origin.example.com"));
+        assert!(json.contains("did:plc:test123"));
+        assert!(json.contains("export_token_202"));
+
+        let deserialized: ExportPDSRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.pds_host, "https://origin.example.com");
+        assert_eq!(deserialized.did, "did:plc:test123");
+        assert_eq!(deserialized.token, "export_token_202");
+    }
+
+    #[test]
+    fn test_multicodec_wrap_edge_cases() {
+        // Test with single byte
+        let single_byte = vec![0x42];
+        let wrapped = multicodec_wrap(single_byte.clone());
+        assert_eq!(wrapped[0], 0xe7);
+        assert!(wrapped.ends_with(&single_byte));
+        assert_eq!(wrapped.len(), 3); // 2 bytes for varint + 1 byte input
+
+        // Test with max value bytes
+        let max_bytes = vec![0xFF, 0xFF, 0xFF];
+        let wrapped = multicodec_wrap(max_bytes.clone());
+        assert_eq!(wrapped[0], 0xe7);
+        assert!(wrapped.ends_with(&max_bytes));
+    }
+
+    #[test]
+    fn test_public_key_to_did_key_format() {
+        let secp = Secp256k1::new();
+        let secret_key =
+            SecretKey::from_str("0000000000000000000000000000000000000000000000000000000000000001")
+                .expect("Valid secret key");
+        let public_key = PublicKey::from_secret_key(&secp, &secret_key);
+
+        let did_key = public_key_to_did_key(public_key);
+
+        // Verify DID key format
+        assert!(did_key.starts_with("did:key:z"));
+
+        // Verify it's base58btc encoded (should contain valid base58btc characters)
+        let encoded_part = &did_key[8..]; // Skip "did:key:" prefix
+        assert!(encoded_part
+            .chars()
+            .all(|c| "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz".contains(c)));
+
+        // Verify reasonable length (multicodec + compressed pubkey + base58 overhead)
+        assert!(did_key.len() >= 50 && did_key.len() <= 100);
+    }
+
+    #[test]
+    fn test_create_account_request_optional_fields() {
+        use bsky_sdk::api::types::string::Did;
+
+        let did: Did = "did:plc:test123".parse().unwrap();
+
+        // Test with minimal fields
+        let minimal_request = CreateAccountRequest {
+            did: did.clone(),
+            email: None,
+            handle: "test.handle".to_string(),
+            invite_code: None,
+            password: None,
+            recovery_key: None,
+            verification_code: None,
+            verification_phone: None,
+            plc_op: None,
+            token: None,
+        };
+
+        let json = serde_json::to_string(&minimal_request).unwrap();
+        let deserialized: CreateAccountRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.did, did);
+        assert_eq!(deserialized.handle, "test.handle");
+        assert!(deserialized.email.is_none());
+        assert!(deserialized.password.is_none());
+
+        // Test with all fields
+        let full_request = CreateAccountRequest {
+            did: did.clone(),
+            email: Some("test@example.com".to_string()),
+            handle: "test.handle".to_string(),
+            invite_code: Some("invite123".to_string()),
+            password: Some("password123".to_string()),
+            recovery_key: Some("recovery123".to_string()),
+            verification_code: Some("verify123".to_string()),
+            verification_phone: Some("+1234567890".to_string()),
+            plc_op: Some("plc_op_data".to_string()),
+            token: Some("token123".to_string()),
+        };
+
+        let json = serde_json::to_string(&full_request).unwrap();
+        let deserialized: CreateAccountRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.email, Some("test@example.com".to_string()));
+        assert_eq!(
+            deserialized.verification_phone,
+            Some("+1234567890".to_string())
+        );
     }
 }
