@@ -768,3 +768,174 @@ pub async fn get_recommended(pds_host: &str, access_token: &str) -> GetRecommend
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mockall::mock;
+
+    // Mock types for testing
+    mock! {
+        HttpClient {}
+        impl Clone for HttpClient {
+            fn clone(&self) -> Self;
+        }
+    }
+
+    #[test]
+    fn test_plc_operation_serialization() {
+        let mut services = BTreeMap::new();
+        services.insert(
+            "atproto_pds".to_string(),
+            PlcOpService {
+                r#type: "AtprotoPersonalDataServer".to_string(),
+                endpoint: "https://example.com".to_string(),
+            },
+        );
+
+        let mut verification_methods = BTreeMap::new();
+        verification_methods.insert("key1".to_string(), "did:key:test".to_string());
+
+        let plc_op = PlcOperation {
+            r#type: "plc_operation".to_string(),
+            rotation_keys: vec!["key1".to_string()],
+            verification_methods,
+            also_known_as: vec!["at://handle.test".to_string()],
+            services,
+            prev: Some("prev_cid".to_string()),
+            sig: Some("signature".to_string()),
+        };
+
+        // Test serialization doesn't panic
+        let json = serde_json::to_string(&plc_op).unwrap();
+        assert!(json.contains("plc_operation"));
+        assert!(json.contains("AtprotoPersonalDataServer"));
+
+        // Test deserialization
+        let deserialized: PlcOperation = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.r#type, "plc_operation");
+        assert_eq!(deserialized.rotation_keys.len(), 1);
+    }
+
+    #[test]
+    fn test_plc_log_audit_entry_serialization() {
+        let mut services = BTreeMap::new();
+        services.insert(
+            "atproto_pds".to_string(),
+            PlcOpService {
+                r#type: "AtprotoPersonalDataServer".to_string(),
+                endpoint: "https://example.com".to_string(),
+            },
+        );
+
+        let plc_op = PlcOperation {
+            r#type: "plc_operation".to_string(),
+            rotation_keys: vec!["key1".to_string()],
+            verification_methods: BTreeMap::new(),
+            also_known_as: vec![],
+            services,
+            prev: None,
+            sig: None,
+        };
+
+        let audit_entry = PlcLogAuditEntry {
+            did: "did:plc:test123".to_string(),
+            operation: plc_op,
+            cid: "bafytest123".to_string(),
+            nullified: false,
+            created_at: "2023-01-01T00:00:00Z".to_string(),
+        };
+
+        // Test serialization
+        let json = serde_json::to_string(&audit_entry).unwrap();
+        assert!(json.contains("did:plc:test123"));
+        assert!(json.contains("bafytest123"));
+
+        // Test deserialization
+        let deserialized: PlcLogAuditEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.did, "did:plc:test123");
+        assert!(!deserialized.nullified);
+    }
+
+    #[test]
+    fn test_get_recommended_response_serialization() {
+        let mut services = BTreeMap::new();
+        services.insert(
+            "atproto_pds".to_string(),
+            PlcOpService {
+                r#type: "AtprotoPersonalDataServer".to_string(),
+                endpoint: "https://example.com".to_string(),
+            },
+        );
+
+        let mut verification_methods = BTreeMap::new();
+        verification_methods.insert("key1".to_string(), "did:key:test".to_string());
+
+        let response = GetRecommendedResponse {
+            rotation_keys: vec!["key1".to_string(), "key2".to_string()],
+            also_known_as: vec!["at://handle.test".to_string()],
+            services,
+            verification_methods,
+        };
+
+        // Test serialization
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("rotationKeys"));
+        assert!(json.contains("alsoKnownAs"));
+        assert!(json.contains("verificationMethods"));
+
+        // Test deserialization
+        let deserialized: GetRecommendedResponse = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.rotation_keys.len(), 2);
+        assert_eq!(deserialized.also_known_as.len(), 1);
+    }
+
+    #[test]
+    fn test_plc_op_service() {
+        let service = PlcOpService {
+            r#type: "AtprotoPersonalDataServer".to_string(),
+            endpoint: "https://test.example.com".to_string(),
+        };
+
+        assert_eq!(service.r#type, "AtprotoPersonalDataServer");
+        assert_eq!(service.endpoint, "https://test.example.com");
+
+        // Test clone
+        let cloned = service.clone();
+        assert_eq!(cloned.r#type, service.r#type);
+        assert_eq!(cloned.endpoint, service.endpoint);
+    }
+
+    #[tokio::test]
+    async fn test_generate_service_auth_without_pds() {
+        // This function is currently empty, so just test it doesn't panic
+        generate_service_auth_without_pds().await;
+    }
+
+    #[test]
+    fn test_plc_directory_constant() {
+        assert_eq!(PLC_DIRECTORY, "https://plc.directory");
+    }
+
+    // Test error handling in functions that return PdsError
+    #[test]
+    fn test_pds_error_variants() {
+        // Test that PdsError variants can be created and compared
+        let errors = vec![
+            PdsError::Validation,
+            PdsError::AccountStatus,
+            PdsError::Login,
+            PdsError::Runtime,
+            PdsError::CreateAccount,
+            PdsError::AccountExport,
+            PdsError::AccountImport,
+            PdsError::RateLimitReached,
+        ];
+
+        for error in errors {
+            // Test that errors implement Debug
+            let debug_str = format!("{:?}", error);
+            assert!(!debug_str.is_empty());
+        }
+    }
+}

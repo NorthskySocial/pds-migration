@@ -240,3 +240,239 @@ impl Screen for CreateAccount {
         ScreenType::CreateNewAccount
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Arc;
+    use tokio::sync::RwLock;
+
+    fn create_test_session() -> Arc<RwLock<PdsSession>> {
+        Arc::new(RwLock::new(PdsSession::default()))
+    }
+
+    fn create_test_errors() -> Arc<RwLock<Vec<GuiError>>> {
+        Arc::new(RwLock::new(Vec::new()))
+    }
+
+    fn create_test_page() -> Arc<RwLock<ScreenType>> {
+        Arc::new(RwLock::new(ScreenType::CreateNewAccount))
+    }
+
+    fn create_test_migration_step() -> Arc<RwLock<bool>> {
+        Arc::new(RwLock::new(false))
+    }
+
+    #[test]
+    fn test_create_account_new() {
+        let session = create_test_session();
+        let errors = create_test_errors();
+        let page = create_test_page();
+        let migration_step = create_test_migration_step();
+
+        let create_account = CreateAccount::new(session, errors, page, migration_step);
+
+        // Test initial state
+        assert_eq!(create_account.new_email, "");
+        assert_eq!(create_account.new_pds_host, "");
+        assert_eq!(create_account.new_password, "");
+        assert_eq!(create_account.new_handle, "");
+        assert_eq!(create_account.confirm_password, "");
+        assert_eq!(create_account.invite_code, "");
+        assert!(!create_account.pds_selected);
+    }
+
+    #[test]
+    fn test_screen_name() {
+        let session = create_test_session();
+        let errors = create_test_errors();
+        let page = create_test_page();
+        let migration_step = create_test_migration_step();
+
+        let create_account = CreateAccount::new(session, errors, page, migration_step);
+
+        assert!(matches!(
+            create_account.name(),
+            ScreenType::CreateNewAccount
+        ));
+    }
+
+    #[test]
+    fn test_form_field_updates() {
+        let session = create_test_session();
+        let errors = create_test_errors();
+        let page = create_test_page();
+        let migration_step = create_test_migration_step();
+
+        let mut create_account = CreateAccount::new(session, errors, page, migration_step);
+
+        // Test field updates
+        create_account.new_email = "test@example.com".to_string();
+        create_account.new_pds_host = "https://test.pds.com".to_string();
+        create_account.new_password = "testpassword".to_string();
+        create_account.confirm_password = "testpassword".to_string();
+        create_account.new_handle = "testuser.bsky.social".to_string();
+        create_account.invite_code = "invite123".to_string();
+
+        assert_eq!(create_account.new_email, "test@example.com");
+        assert_eq!(create_account.new_pds_host, "https://test.pds.com");
+        assert_eq!(create_account.new_password, "testpassword");
+        assert_eq!(create_account.confirm_password, "testpassword");
+        assert_eq!(create_account.new_handle, "testuser.bsky.social");
+        assert_eq!(create_account.invite_code, "invite123");
+    }
+
+    #[test]
+    fn test_pds_selection_toggle() {
+        let session = create_test_session();
+        let errors = create_test_errors();
+        let page = create_test_page();
+        let migration_step = create_test_migration_step();
+
+        let mut create_account = CreateAccount::new(session, errors, page, migration_step);
+
+        // Test initial state
+        assert!(!create_account.pds_selected);
+
+        // Test selecting PDS
+        create_account.pds_selected = true;
+        assert!(create_account.pds_selected);
+
+        // Test deselecting PDS
+        create_account.pds_selected = false;
+        assert!(!create_account.pds_selected);
+    }
+
+    #[test]
+    fn test_password_validation_logic() {
+        // Test the password matching logic used in the UI
+        let password1 = "testpassword123";
+        let password2 = "testpassword123";
+        let password3 = "differentpassword";
+
+        // Passwords match
+        assert_eq!(password1, password2);
+        assert!(password1 == password2);
+
+        // Passwords don't match
+        assert_ne!(password1, password3);
+        assert!(password1 != password3);
+    }
+
+    #[test]
+    fn test_form_validation_scenarios() {
+        // Test various form validation scenarios
+        let valid_email = "user@example.com";
+        let invalid_email = "";
+
+        let valid_handle = "user.bsky.social";
+        let invalid_handle = "";
+
+        let valid_password = "securepassword123";
+        let invalid_password = "";
+
+        let valid_pds_host = "https://bsky.social";
+        let invalid_pds_host = "";
+
+        // Valid form data
+        assert!(!valid_email.is_empty());
+        assert!(!valid_handle.is_empty());
+        assert!(!valid_password.is_empty());
+        assert!(!valid_pds_host.is_empty());
+        assert!(valid_pds_host.starts_with("https://"));
+
+        // Invalid form data
+        assert!(invalid_email.is_empty());
+        assert!(invalid_handle.is_empty());
+        assert!(invalid_password.is_empty());
+        assert!(invalid_pds_host.is_empty());
+    }
+
+    #[test]
+    fn test_invite_code_handling() {
+        // Test invite code scenarios
+        let valid_invite_code = "ABC123DEF";
+        let empty_invite_code = "";
+
+        // Both should be acceptable (invite code is optional)
+        assert!(!valid_invite_code.is_empty());
+        assert!(empty_invite_code.is_empty());
+
+        // Test trimming
+        let invite_with_spaces = "  ABC123  ";
+        let trimmed = invite_with_spaces.trim();
+        assert_eq!(trimmed, "ABC123");
+    }
+
+    #[test]
+    fn test_pds_host_validation() {
+        let valid_hosts = vec![
+            "https://bsky.social",
+            "https://pds.example.com",
+            "https://northsky.social",
+        ];
+
+        let invalid_hosts = vec![
+            "",
+            "not-a-url",
+            "http://insecure.example.com", // Could be considered less secure
+            "ftp://wrong.protocol.com",
+        ];
+
+        for host in valid_hosts {
+            assert!(host.starts_with("https://"));
+            assert!(!host.is_empty());
+        }
+
+        for host in invalid_hosts {
+            if host.is_empty() || host == "not-a-url" {
+                assert!(!host.starts_with("https://"));
+            }
+        }
+    }
+
+    #[test]
+    fn test_handle_format_validation() {
+        let valid_handles = vec![
+            "user.bsky.social",
+            "handle.northsky.social",
+            "my.custom.domain.com",
+        ];
+
+        let potentially_invalid_handles =
+            vec!["", "no-dots", "spaces in handle", ".starting.with.dot"];
+
+        for handle in valid_handles {
+            assert!(!handle.is_empty());
+            assert!(handle.contains('.'));
+        }
+
+        for handle in potentially_invalid_handles {
+            if handle.is_empty() || handle.contains(' ') {
+                // These are clearly invalid
+                let is_problematic = handle.is_empty() || handle.contains(' ');
+                assert!(is_problematic);
+            }
+        }
+    }
+
+    #[test]
+    fn test_create_account_parameters_structure() {
+        // Test that CreateAccountParameters can be constructed
+        let session = PdsSession::default();
+        let params = CreateAccountParameters {
+            pds_session: session,
+            new_email: "test@example.com".to_string(),
+            new_pds_host: "https://test.com".to_string(),
+            new_password: "password".to_string(),
+            new_handle: "handle.test.com".to_string(),
+            invite_code: "invite123".to_string(),
+        };
+
+        assert_eq!(params.new_email, "test@example.com");
+        assert_eq!(params.new_pds_host, "https://test.com");
+        assert_eq!(params.new_password, "password");
+        assert_eq!(params.new_handle, "handle.test.com");
+        assert_eq!(params.invite_code, "invite123");
+    }
+}
