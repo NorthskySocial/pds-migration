@@ -1,14 +1,17 @@
+use crate::agent::login_helper2;
 use crate::errors::GuiError;
 use crate::screens::Screen;
 use crate::session::session_config::PdsSession;
 use crate::{
-    create_account, fetch_tos_and_privacy_policy, styles, CreateAccountParameters, ScreenType,
+    check_did_exists, create_account, fetch_tos_and_privacy_policy, styles,
+    CreateAccountParameters, ScreenType,
 };
+use bsky_sdk::BskyAgent;
 use egui::Ui;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-pub struct CreateAccount {
+pub struct CreateOrLoginAccount {
     new_pds_host: String,
     new_handle: String,
     new_password: String,
@@ -24,9 +27,17 @@ pub struct CreateAccount {
     available_user_domains: Arc<RwLock<Vec<String>>>,
     page: Arc<RwLock<ScreenType>>,
     pds_migration_step: Arc<RwLock<bool>>,
+    ui_mode: Arc<RwLock<UiMode>>,
 }
 
-impl CreateAccount {
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum UiMode {
+    SelectPds,
+    CreatePds,
+    Login,
+}
+
+impl CreateOrLoginAccount {
     pub fn new(
         pds_session: Arc<RwLock<PdsSession>>,
         error: Arc<RwLock<Vec<GuiError>>>,
@@ -49,6 +60,7 @@ impl CreateAccount {
             available_user_domains: Arc::new(Default::default()),
             page,
             pds_migration_step,
+            ui_mode: Arc::new(RwLock::from(UiMode::SelectPds)),
         }
     }
 
@@ -59,21 +71,52 @@ impl CreateAccount {
         let invite_code_required = self.invite_code_required.clone();
         let available_user_domains = self.available_user_domains.clone();
         let new_pds_host = self.new_pds_host.clone();
+        let ui_mode = self.ui_mode.clone();
+        let pds_session = {
+            let lock = self.pds_session.clone();
+            let value = lock.blocking_read();
+            value.clone()
+        };
+        let did = pds_session.did().clone().unwrap();
         tokio::spawn(async move {
-            match fetch_tos_and_privacy_policy(new_pds_host).await {
-                Ok(result) => {
-                    let mut privacy_policy_write = privacy_policy_lock.write().await;
-                    *privacy_policy_write = result.privacy_policy;
-                    let mut terms_of_service_lock = terms_of_service_lock.write().await;
-                    *terms_of_service_lock = result.terms_of_service;
-                    let mut invite_code_required_write = invite_code_required.write().await;
-                    *invite_code_required_write = result.invite_code_required;
-                    let mut available_user_domains_write = available_user_domains.write().await;
-                    *available_user_domains_write = result.available_user_domains;
+            match check_did_exists(new_pds_host.as_str(), did.as_str()).await {
+                Ok(res) => {
+                    if res {
+                        let mut ui_mode_write = ui_mode.write().await;
+                        *ui_mode_write = UiMode::Login;
+                    } else {
+                        let mut ui_mode_write = ui_mode.write().await;
+                        *ui_mode_write = UiMode::CreatePds;
+                    }
                 }
                 Err(e) => {
                     let mut errors = error.write().await;
                     errors.push(e);
+                    let mut ui_mode_write = ui_mode.write().await;
+                    *ui_mode_write = UiMode::SelectPds;
+                    return;
+                }
+            }
+            let ui_mode = {
+                let ui_mode_read = ui_mode.read().await;
+                ui_mode_read.clone()
+            };
+            if ui_mode == UiMode::CreatePds {
+                match fetch_tos_and_privacy_policy(new_pds_host).await {
+                    Ok(result) => {
+                        let mut privacy_policy_write = privacy_policy_lock.write().await;
+                        *privacy_policy_write = result.privacy_policy;
+                        let mut terms_of_service_lock = terms_of_service_lock.write().await;
+                        *terms_of_service_lock = result.terms_of_service;
+                        let mut invite_code_required_write = invite_code_required.write().await;
+                        *invite_code_required_write = result.invite_code_required;
+                        let mut available_user_domains_write = available_user_domains.write().await;
+                        *available_user_domains_write = result.available_user_domains;
+                    }
+                    Err(e) => {
+                        let mut errors = error.write().await;
+                        errors.push(e);
+                    }
                 }
             }
         });
@@ -129,10 +172,26 @@ impl CreateAccount {
             }
         });
     }
-}
 
-impl Screen for CreateAccount {
-    fn ui(&mut self, ui: &mut Ui, ctx: &egui::Context) {
+    fn select_pds(&mut self, ui: &mut Ui, ctx: &egui::Context) {
+        let _handle = self.new_handle.clone();
+        styles::render_subtitle(ui, ctx, "Select PDS!");
+        ui.vertical_centered(|ui| {
+            styles::render_input(
+                ui,
+                "New PDS Host",
+                &mut self.new_pds_host,
+                false,
+                Some("https://northsky.social"),
+            );
+            styles::render_button(ui, ctx, "Update", || {
+                self.pds_selected = true;
+                self.update_pds();
+            });
+        });
+    }
+
+    fn create_ui(&mut self, ui: &mut Ui, ctx: &egui::Context) {
         let _handle = self.new_handle.clone();
         let available_user_domains = {
             let available_user_domains = self.available_user_domains.blocking_read();
@@ -273,8 +332,108 @@ impl Screen for CreateAccount {
         });
     }
 
+    #[tracing::instrument(skip(self))]
+    fn new_session_login(&mut self) {
+        let new_pds_host = self.new_pds_host.to_string();
+        let new_handle = self.new_handle.to_string();
+        let new_password = self.new_password.to_string();
+        let pds_session_lock = self.pds_session.clone();
+        let error_lock = self.error.clone();
+        let page_lock = self.page.clone();
+        let pds_migration_step_lock = self.pds_migration_step.clone();
+
+        tokio::spawn(async move {
+            let bsky_agent = BskyAgent::builder().build().await.unwrap();
+            match login_helper2(
+                &bsky_agent,
+                new_pds_host.as_str(),
+                new_handle.as_str(),
+                new_password.as_str(),
+            )
+            .await
+            {
+                Ok(res) => {
+                    tracing::info!("Login successful");
+                    let access_token = res.access_jwt.clone();
+                    let refresh_token = res.refresh_jwt.clone();
+                    let did = res.did.as_str().to_string();
+                    {
+                        let mut pds_session = pds_session_lock.write().await;
+                        pds_session.create_new_session(
+                            did.as_str(),
+                            access_token.as_str(),
+                            refresh_token.as_str(),
+                            new_pds_host.as_str(),
+                        );
+                    }
+                    let pds_migration_step = {
+                        let value = pds_migration_step_lock.read().await;
+                        *value
+                    };
+                    if pds_migration_step {
+                        let mut page = page_lock.write().await;
+                        *page = ScreenType::ExportRepo;
+                    } else {
+                        let mut page = page_lock.write().await;
+                        *page = ScreenType::Basic;
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Error logging in: {e}");
+                    let mut error = error_lock.write().await;
+                    error.push(GuiError::Other);
+                }
+            };
+        });
+    }
+
+    fn login_ui(&mut self, ui: &mut Ui, ctx: &egui::Context) {
+        styles::render_subtitle(ui, ctx, "New PDS Login!");
+        ui.vertical_centered(|ui| {
+            styles::render_input(
+                ui,
+                "New PDS Host",
+                &mut self.new_pds_host,
+                false,
+                Some("https://northsky.social"),
+            );
+            styles::render_input(
+                ui,
+                "Handle",
+                &mut self.new_handle,
+                false,
+                Some("user.northsky.social"),
+            );
+            styles::render_input(ui, "Password", &mut self.new_password, true, None);
+            styles::render_button(ui, ctx, "Submit", || {
+                self.new_session_login();
+            });
+        });
+    }
+}
+
+impl Screen for CreateOrLoginAccount {
+    fn ui(&mut self, ui: &mut Ui, ctx: &egui::Context) {
+        let ui_mode = {
+            let lock = self.ui_mode.clone();
+            let value = lock.blocking_read();
+            value.clone()
+        };
+        match ui_mode {
+            UiMode::SelectPds => {
+                self.select_pds(ui, ctx);
+            }
+            UiMode::CreatePds => {
+                self.create_ui(ui, ctx);
+            }
+            UiMode::Login => {
+                self.login_ui(ui, ctx);
+            }
+        }
+    }
+
     fn name(&self) -> ScreenType {
-        ScreenType::CreateNewAccount
+        ScreenType::CreateOrLoginAccount
     }
 }
 
@@ -293,7 +452,7 @@ mod tests {
     }
 
     fn create_test_page() -> Arc<RwLock<ScreenType>> {
-        Arc::new(RwLock::new(ScreenType::CreateNewAccount))
+        Arc::new(RwLock::new(ScreenType::CreateOrLoginAccount))
     }
 
     fn create_test_migration_step() -> Arc<RwLock<bool>> {
@@ -307,7 +466,7 @@ mod tests {
         let page = create_test_page();
         let migration_step = create_test_migration_step();
 
-        let create_account = CreateAccount::new(session, errors, page, migration_step);
+        let create_account = CreateOrLoginAccount::new(session, errors, page, migration_step);
 
         // Test initial state
         assert_eq!(create_account.new_email, "");
@@ -326,11 +485,11 @@ mod tests {
         let page = create_test_page();
         let migration_step = create_test_migration_step();
 
-        let create_account = CreateAccount::new(session, errors, page, migration_step);
+        let create_account = CreateOrLoginAccount::new(session, errors, page, migration_step);
 
         assert!(matches!(
             create_account.name(),
-            ScreenType::CreateNewAccount
+            ScreenType::CreateOrLoginAccount
         ));
     }
 
@@ -341,7 +500,7 @@ mod tests {
         let page = create_test_page();
         let migration_step = create_test_migration_step();
 
-        let mut create_account = CreateAccount::new(session, errors, page, migration_step);
+        let mut create_account = CreateOrLoginAccount::new(session, errors, page, migration_step);
 
         // Test field updates
         create_account.new_email = "test@example.com".to_string();
@@ -366,7 +525,7 @@ mod tests {
         let page = create_test_page();
         let migration_step = create_test_migration_step();
 
-        let mut create_account = CreateAccount::new(session, errors, page, migration_step);
+        let mut create_account = CreateOrLoginAccount::new(session, errors, page, migration_step);
 
         // Test initial state
         assert!(!create_account.pds_selected);

@@ -194,18 +194,14 @@ impl PdsMigrationApp {
                 self.error.clone(),
                 self.page.clone(),
             )),
-            ScreenType::NewLogin => Box::new(screens::new_login::NewLogin::new(
-                self.pds_session.clone(),
-                self.error.clone(),
-                self.page.clone(),
-                self.pds_migration_step.clone(),
-            )),
-            ScreenType::AccountCreate => Box::new(screens::create_account::CreateAccount::new(
-                self.pds_session.clone(),
-                self.error.clone(),
-                self.page.clone(),
-                self.pds_migration_step.clone(),
-            )),
+            ScreenType::AccountCreate => {
+                Box::new(screens::create_or_login_account::CreateOrLoginAccount::new(
+                    self.pds_session.clone(),
+                    self.error.clone(),
+                    self.page.clone(),
+                    self.pds_migration_step.clone(),
+                ))
+            }
             ScreenType::MigratePLC => Box::new(screens::migrate_plc::MigratePLC::new(
                 self.pds_session.clone(),
                 self.error.clone(),
@@ -244,15 +240,14 @@ impl PdsMigrationApp {
                     self.pds_migration_step.clone(),
                 ),
             ),
-            ScreenType::DoesAccountExist => Box::new(screens::does_pds_exist::DoesPdsExist::new(
-                self.page.clone(),
-            )),
-            ScreenType::CreateNewAccount => Box::new(screens::create_account::CreateAccount::new(
-                self.pds_session.clone(),
-                self.error.clone(),
-                self.page.clone(),
-                self.pds_migration_step.clone(),
-            )),
+            ScreenType::CreateOrLoginAccount => {
+                Box::new(screens::create_or_login_account::CreateOrLoginAccount::new(
+                    self.pds_session.clone(),
+                    self.error.clone(),
+                    self.page.clone(),
+                    self.pds_migration_step.clone(),
+                ))
+            }
             ScreenType::ExportRepo => Box::new(screens::export_repo::ExportRepo::new(
                 self.pds_session.clone(),
                 self.error.clone(),
@@ -268,17 +263,6 @@ impl PdsMigrationApp {
                 self.error.clone(),
                 self.page.clone(),
             )),
-            // ScreenType::EditPLC => Box::new(screens::edit_plc::EditPlc::new(
-            //     self.pds_session.clone(),
-            //     self.error.clone(),
-            //     self.page.clone(),
-            // )),
-            // ScreenType::MigrateWithoutPds => {
-            //     Box::new(screens::migrate_without_pds::MigrateWithoutPds::new(
-            //         self.error.clone(),
-            //         self.page.clone(),
-            //     ))
-            // }
         };
 
         // Reassign the current_screen

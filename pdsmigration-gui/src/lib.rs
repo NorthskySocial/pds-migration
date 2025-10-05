@@ -5,6 +5,7 @@ use crate::ipld::cid_for_cbor;
 use crate::session::session_config::{PdsSession, SessionConfig};
 use base64ct::{Base64, Encoding};
 use bsky_sdk::api::agent::Configure;
+use bsky_sdk::api::types::string::Did;
 use bsky_sdk::BskyAgent;
 use hex::ToHex;
 use indexmap::IndexMap;
@@ -24,6 +25,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::io::Write;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::SystemTime;
 use zip::write::SimpleFileOptions;
@@ -45,7 +47,6 @@ pub enum ScreenType {
     Basic,
     Advanced,
     OldLogin,
-    NewLogin,
     AccountCreate,
     MigratePLC,
     Success,
@@ -53,12 +54,9 @@ pub enum ScreenType {
     ImportBlobs,
     MigratePreferences,
     ActiveAccounts,
-    DoesAccountExist,
-    CreateNewAccount,
+    CreateOrLoginAccount,
     ExportRepo,
     ImportRepo,
-    // MigrateWithoutPds,
-    // EditPLC,
 }
 
 #[tracing::instrument(skip(session_config))]
@@ -623,6 +621,30 @@ pub struct DescribePDS {
     pub privacy_policy: Option<String>,
     pub invite_code_required: bool,
     pub available_user_domains: Vec<String>,
+}
+
+#[tracing::instrument]
+pub async fn check_did_exists(new_pds_host: &str, did: &str) -> Result<bool, GuiError> {
+    tracing::info!("Checking if DID exists on new PDS: {new_pds_host} {did}");
+    use bsky_sdk::api::com::atproto::sync::get_repo_status::{Parameters, ParametersData};
+    let bsky_agent = BskyAgent::builder().build().await.unwrap();
+    bsky_agent.configure_endpoint(new_pds_host.to_string());
+    match bsky_agent
+        .api
+        .com
+        .atproto
+        .sync
+        .get_repo_status(Parameters {
+            data: ParametersData {
+                did: Did::from_str(did).unwrap(),
+            },
+            extra_data: ipld_core::ipld::Ipld::Null,
+        })
+        .await
+    {
+        Ok(_) => Ok(true),
+        Err(_) => Ok(false),
+    }
 }
 
 #[tracing::instrument]
