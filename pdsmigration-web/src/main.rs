@@ -3,7 +3,7 @@ mod errors;
 use crate::errors::ApiError;
 use actix_web::dev::Server;
 use actix_web::web::Json;
-use actix_web::{middleware, post, App, HttpResponse, HttpServer};
+use actix_web::{get, middleware, post, App, HttpResponse, HttpServer, Responder};
 use dotenvy::dotenv;
 use pdsmigration_common::{
     ActivateAccountRequest, CreateAccountApiRequest, DeactivateAccountRequest, ExportBlobsRequest,
@@ -30,6 +30,7 @@ fn init_http_server(server_port: &str, worker_count: &str) -> Server {
             .service(migrate_preferences_api)
             .service(migrate_plc_api)
             .service(get_service_auth_api)
+            .service(health_check)
     })
     .bind(format!("0.0.0.0:{server_port}"))
     .unwrap()
@@ -53,6 +54,11 @@ async fn main() -> io::Result<()> {
     // Start Http Server
     let server = init_http_server(server_port.as_str(), worker_count.as_str());
     server.await
+}
+
+#[get("/health")]
+async fn health_check() -> impl Responder {
+    HttpResponse::Ok().body("OK")
 }
 
 #[post("/service-auth")]
