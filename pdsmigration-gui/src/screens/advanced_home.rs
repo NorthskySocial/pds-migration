@@ -150,7 +150,7 @@ impl Screen for AdvancedHome {
                                 let cid_str = format!("{:?}\n", blob.cid);
                                 file.write_all(cid_str.as_bytes()).await.unwrap();
                             }
-                            tracing::info!("Deactivated account");
+                            tracing::info!("Found missing blobs");
                         }
                         Err(e) => {
                             let mut error_write = error.write().await;
