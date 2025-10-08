@@ -99,7 +99,7 @@ impl CreateOrLoginAccount {
             }
             let ui_mode = {
                 let ui_mode_read = ui_mode.read().await;
-                ui_mode_read.clone()
+                *ui_mode_read
             };
             if ui_mode == UiMode::CreatePds {
                 match fetch_tos_and_privacy_policy(new_pds_host).await {
@@ -189,6 +189,55 @@ impl CreateOrLoginAccount {
                 self.update_pds();
             });
         });
+    }
+
+    #[tracing::instrument(skip(self))]
+    fn validate_create_inputs(&self) -> bool {
+        if self.new_password != self.confirm_password {
+            tracing::error!("Passwords do not match");
+            return false;
+        }
+        if self.new_password.is_empty() {
+            tracing::error!("Password cannot be empty");
+            return false;
+        }
+        if self.new_handle.is_empty() {
+            tracing::error!("Handle cannot be empty");
+        }
+        if self.new_email.is_empty() {
+            tracing::error!("Email cannot be empty");
+            return false;
+        }
+        if self.new_pds_host.is_empty() {
+            tracing::error!("PDS Host cannot be empty");
+            return false;
+        }
+        match reqwest::Url::parse(self.new_pds_host.as_str()) {
+            Ok(url) if url.scheme() == "https" && url.host_str().is_some() => {}
+            Ok(_) => {
+                tracing::error!("PDS host must use HTTPS protocol");
+                return false;
+            }
+            Err(e) => {
+                tracing::error!(
+                    "Invalid URL format. PDS host must use HTTPS protocol: {}",
+                    e
+                );
+                return false;
+            }
+        }
+
+        let invite_code_required = {
+            let invite_code_required_lock = self.invite_code_required.clone();
+            let value = invite_code_required_lock.blocking_read();
+            *value
+        };
+        if invite_code_required && self.invite_code.is_empty() {
+            tracing::error!("Invite Code cannot be empty");
+            return false;
+        }
+
+        true
     }
 
     fn create_ui(&mut self, ui: &mut Ui, ctx: &egui::Context) {
@@ -292,41 +341,9 @@ impl CreateOrLoginAccount {
                     });
                 }
                 styles::render_button(ui, ctx, "Submit", || {
-                    if self.new_password != self.confirm_password {
-                        tracing::error!("Passwords do not match");
-                        return;
+                    if self.validate_create_inputs() {
+                        self.submit();
                     }
-                    if self.new_password.is_empty() {
-                        tracing::error!("Password is empty");
-                        return;
-                    }
-                    if self.new_handle.is_empty() {
-                        tracing::error!("Handle is empty");
-                    }
-                    if self.new_email.is_empty() {
-                        tracing::error!("Email is empty");
-                        return;
-                    }
-                    if self.new_pds_host.is_empty() {
-                        tracing::error!("PDS Host is empty");
-                        return;
-                    }
-                    if self.invite_code.is_empty() {
-                        tracing::error!("Invite Code is empty");
-                        return;
-                    }
-
-                    let invite_code_required = {
-                        let invite_code_required_lock = self.invite_code_required.clone();
-                        let value = invite_code_required_lock.blocking_read();
-                        *value
-                    };
-                    if invite_code_required && self.invite_code.is_empty() {
-                        tracing::error!("Invite Code is empty");
-                        return;
-                    }
-
-                    self.submit();
                 });
             }
         });
@@ -387,6 +404,40 @@ impl CreateOrLoginAccount {
         });
     }
 
+    #[tracing::instrument(skip(self))]
+    fn validate_login_inputs(&self) -> bool {
+        let new_pds_host = self.new_pds_host.to_string();
+        let new_handle = self.new_handle.to_string();
+        let new_password = self.new_password.to_string();
+
+        match reqwest::Url::parse(new_pds_host.as_str()) {
+            Ok(url) if url.scheme() == "https" && url.host_str().is_some() => {}
+            Ok(_) => {
+                tracing::error!("PDS host must use HTTPS protocol");
+                return false;
+            }
+            Err(e) => {
+                tracing::error!(
+                    "Invalid URL format. PDS host must use HTTPS protocol: {}",
+                    e
+                );
+                return false;
+            }
+        }
+
+        if new_handle.is_empty() {
+            tracing::error!("Handle cannot be empty");
+            return false;
+        }
+
+        if new_password.is_empty() {
+            tracing::error!("Password cannot be empty");
+            return false;
+        }
+
+        true
+    }
+
     fn login_ui(&mut self, ui: &mut Ui, ctx: &egui::Context) {
         styles::render_subtitle(ui, ctx, "New PDS Login!");
         ui.vertical_centered(|ui| {
@@ -406,7 +457,9 @@ impl CreateOrLoginAccount {
             );
             styles::render_input(ui, "Password", &mut self.new_password, true, None);
             styles::render_button(ui, ctx, "Submit", || {
-                self.new_session_login();
+                if self.validate_login_inputs() {
+                    self.new_session_login();
+                }
             });
         });
     }
@@ -417,7 +470,7 @@ impl Screen for CreateOrLoginAccount {
         let ui_mode = {
             let lock = self.ui_mode.clone();
             let value = lock.blocking_read();
-            value.clone()
+            *value
         };
         match ui_mode {
             UiMode::SelectPds => {

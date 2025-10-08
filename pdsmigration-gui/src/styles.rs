@@ -79,7 +79,8 @@ pub fn render_input(
         .password(is_password)
         .desired_width(INPUT_WIDTH);
     if let Some(hint) = text_hint {
-        edit_text = edit_text.hint_text(hint);
+        let hint_text = "ex: ".to_string() + hint;
+        edit_text = edit_text.hint_text(hint_text);
     }
     ui.add(edit_text);
     ui.add_space(WIDGET_SPACING_BASE);
