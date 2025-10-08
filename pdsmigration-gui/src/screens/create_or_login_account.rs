@@ -341,7 +341,9 @@ impl CreateOrLoginAccount {
                     });
                 }
                 styles::render_button(ui, ctx, "Submit", || {
-                    self.submit();
+                    if self.validate_create_inputs() {
+                        self.submit();
+                    }
                 });
             }
         });
