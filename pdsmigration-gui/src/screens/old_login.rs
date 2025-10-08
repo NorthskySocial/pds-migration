@@ -147,14 +147,37 @@ impl OldLogin {
         });
     }
 
-    #[tracing::instrument(skip(self))]
-    fn start_offline_mode(&mut self) {
-        let page_lock = self.page.clone();
-        tokio::spawn(async move {
-            let mut page = page_lock.write().await;
-            *page = ScreenType::Basic;
-            drop(page)
-        });
+    fn validate_inputs(&self) -> bool {
+        let old_pds_host = self.old_pds_host.to_string();
+        let username = self.username.to_string();
+        let password = self.password.to_string();
+
+        match reqwest::Url::parse(old_pds_host.as_str()) {
+            Ok(url) if url.scheme() == "https" && url.host_str().is_some() => {}
+            Ok(_) => {
+                tracing::error!("PDS host must use HTTPS protocol");
+                return false;
+            }
+            Err(e) => {
+                tracing::error!(
+                    "Invalid URL format. PDS host must use HTTPS protocol: {}",
+                    e
+                );
+                return false;
+            }
+        }
+
+        if username.is_empty() {
+            tracing::error!("Username cannot be empty");
+            return false;
+        }
+
+        if password.is_empty() {
+            tracing::error!("Password cannot be empty");
+            return false;
+        }
+
+        true
     }
 }
 
@@ -184,11 +207,9 @@ impl Screen for OldLogin {
                 styles::render_input(ui, "Password", &mut self.password, true, None);
                 ui.add_space(WIDGET_SPACING_BASE);
                 styles::render_button(ui, ctx, "Submit", || {
-                    self.old_session_login();
-                });
-                ui.add_space(WIDGET_SPACING_BASE);
-                styles::render_button(ui, ctx, "Start in Offline Mode", || {
-                    self.start_offline_mode();
+                    if self.validate_inputs() {
+                        self.old_session_login();
+                    }
                 });
             });
         } else {
