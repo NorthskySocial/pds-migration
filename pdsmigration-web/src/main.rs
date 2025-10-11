@@ -55,12 +55,8 @@ async fn main() -> io::Result<()> {
         )
         .finish();
 
-    tracing::subscriber::set_global_default(subscriber).map_err(|e| {
-        io::Error::new(
-            io::ErrorKind::Other,
-            format!("Failed to set tracing subscriber: {}", e),
-        )
-    })?;
+    tracing::subscriber::set_global_default(subscriber)
+        .map_err(|e| io::Error::other(format!("Failed to set tracing subscriber: {}", e)))?;
 
     // Get Environment Variables
     let server_port = env::var("SERVER_PORT").unwrap_or("9090".to_string());
@@ -107,16 +103,14 @@ pub async fn create_account_api(
 #[post("/export-repo")]
 pub async fn export_pds_api(req: Json<ExportPDSRequest>) -> Result<HttpResponse, ApiError> {
     tracing::info!("Exporting repository");
-    pdsmigration_common::export_pds_api(req.into_inner()).await?;
-    tracing::info!("Repository exported successfully");
-    Ok(HttpResponse::Ok().finish())
-}
 
-#[tracing::instrument(skip(req), fields(did = %req.did, pds_host = %req.pds_host))]
-#[post("/import-repo")]
-pub async fn import_pds_api(req: Json<ImportPDSRequest>) -> Result<HttpResponse, ApiError> {
-    tracing::info!("Starting repository import");
+    // Download the repository file locally
+    let req_inner = req.into_inner();
+    let did = req_inner.did.clone();
+    pdsmigration_common::export_pds_api(req_inner).await?;
+    tracing::info!("Repository downloaded successfully");
 
+    // Upload the downloaded file to AWS S3
     let endpoint_url = env::var("ENDPOINT").map_err(|e| {
         tracing::error!("Failed to get ENDPOINT environment variable: {}", e);
         ApiError::Runtime
@@ -131,8 +125,8 @@ pub async fn import_pds_api(req: Json<ImportPDSRequest>) -> Result<HttpResponse,
     let client = aws_sdk_s3::Client::new(&config);
 
     let bucket_name = "migration".to_string();
-    let file_name = req.did.as_str().to_string() + ".car";
-    let key = "migration".to_string() + req.did.as_str() + ".car";
+    let file_name = did.replace(":", "-") + ".car";
+    let key = "migration/".to_string() + &did.replace(":", "-") + ".car";
 
     tracing::debug!(
         "Uploading file {} to S3 bucket {} with key {}",
@@ -141,10 +135,8 @@ pub async fn import_pds_api(req: Json<ImportPDSRequest>) -> Result<HttpResponse,
         key
     );
 
-    let body = match aws_sdk_s3::primitives::ByteStream::from_path(std::path::Path::new(
-        file_name.as_str(),
-    ))
-    .await
+    let body = match aws_sdk_s3::primitives::ByteStream::from_path(std::path::Path::new(&file_name))
+        .await
     {
         Ok(body) => {
             tracing::debug!("Successfully created ByteStream from file");
@@ -183,12 +175,88 @@ pub async fn import_pds_api(req: Json<ImportPDSRequest>) -> Result<HttpResponse,
                 key,
                 e
             );
-            return Err(ApiError::Validation);
+            return Err(ApiError::Runtime);
         }
-    }
+    };
+
+    tracing::info!("Repository exported and uploaded to S3 successfully");
+    Ok(HttpResponse::Ok().finish())
+}
+
+#[tracing::instrument(skip(req), fields(did = %req.did, pds_host = %req.pds_host))]
+#[post("/import-repo")]
+pub async fn import_pds_api(req: Json<ImportPDSRequest>) -> Result<HttpResponse, ApiError> {
+    tracing::info!("Starting repository import");
+
+    let endpoint_url = env::var("ENDPOINT").map_err(|e| {
+        tracing::error!("Failed to get ENDPOINT environment variable: {}", e);
+        ApiError::Runtime
+    })?;
+
+    tracing::debug!("Loading AWS config with endpoint: {}", endpoint_url);
+    let config = aws_config::from_env()
+        .region("auto")
+        .endpoint_url(&endpoint_url)
+        .load()
+        .await;
+    let client = aws_sdk_s3::Client::new(&config);
+
+    let req_inner = req.into_inner();
+    let did = req_inner.did.clone();
+
+    let bucket_name = "migration".to_string();
+    let file_name = did.replace(":", "-") + ".car";
+    let key = "migration/".to_string() + &did.replace(":", "-") + ".car";
+    tracing::debug!(
+        "Uploading file {} to S3 bucket {} with key {}",
+        file_name,
+        bucket_name,
+        key
+    );
+
+    // Download the file from S3
+    let s3_response = match client
+        .get_object()
+        .bucket(&bucket_name)
+        .key(&key)
+        .send()
+        .await
+    {
+        Ok(output) => {
+            tracing::info!(
+                "Successfully downloaded from S3: bucket={}, key={}",
+                bucket_name,
+                key
+            );
+            output
+        }
+        Err(e) => {
+            tracing::error!(
+                "Failed to download from S3: bucket={}, key={}, error={:?}",
+                bucket_name,
+                key,
+                e
+            );
+            return Err(ApiError::Runtime);
+        }
+    };
+
+    // Save the file locally using AWS SDK's built-in method
+    let body_bytes = s3_response.body.collect().await.map_err(|error| {
+        tracing::error!("Failed to collect S3 response body: {:?}", error);
+        ApiError::Runtime
+    })?;
+
+    std::fs::write(&file_name, body_bytes.into_bytes()).map_err(|error| {
+        tracing::error!("Failed to write file {}: {}", file_name, error);
+        ApiError::Runtime
+    })?;
+
+    tracing::info!("File downloaded from S3 and saved locally as {}", file_name);
 
     tracing::info!("Importing repository to PDS");
-    pdsmigration_common::import_pds_api(req.into_inner()).await?;
+
+    pdsmigration_common::import_pds_api(req_inner).await?;
     tracing::info!("Repository imported successfully");
 
     Ok(HttpResponse::Ok().content_type(APPLICATION_JSON).finish())
