@@ -4,9 +4,9 @@ use crate::session::session_config::PdsSession;
 use crate::{activate_account, deactivate_account, export_repo, styles, ScreenType};
 use bsky_sdk::BskyAgent;
 use egui::{ScrollArea, Ui};
-use pdsmigration_common::agent::{login_helper, missing_blobs};
-use pdsmigration_common::errors::PdsError;
-use pdsmigration_common::{upload_blobs_api, UploadBlobsRequest};
+use pdsmigration_common::{
+    build_agent, login_helper, missing_blobs, upload_blobs_api, UploadBlobsRequest,
+};
 use std::sync::Arc;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
@@ -125,14 +125,7 @@ impl Screen for AdvancedHome {
                     Some(config) => config.clone(),
                 };
                 tokio::spawn(async move {
-                    let agent = BskyAgent::builder()
-                        .build()
-                        .await
-                        .map_err(|error| {
-                            tracing::error!("{}", error.to_string());
-                            PdsError::Runtime
-                        })
-                        .unwrap();
+                    let agent = build_agent().await.unwrap();
                     let _session = login_helper(
                         &agent,
                         new_session_config.host(),
@@ -176,14 +169,7 @@ impl Screen for AdvancedHome {
                     Some(config) => config.clone(),
                 };
                 tokio::spawn(async move {
-                    let agent = BskyAgent::builder()
-                        .build()
-                        .await
-                        .map_err(|error| {
-                            tracing::error!("{}", error.to_string());
-                            PdsError::Runtime
-                        })
-                        .unwrap();
+                    let agent = BskyAgent::builder().build().await.unwrap();
                     let session = login_helper(
                         &agent,
                         new_session_config.host(),
@@ -210,14 +196,6 @@ impl Screen for AdvancedHome {
                     }
                 });
             });
-            // styles::render_button(ui, ctx, "Edit PLC", || {
-            //     let page = self.page.clone();
-            //     tokio::spawn(async move {
-            //         tracing::info!("Editing PLC");
-            //         let mut page_write = page.write().await;
-            //         *page_write = ScreenType::EditPLC;
-            //     });
-            // });
         });
     }
 

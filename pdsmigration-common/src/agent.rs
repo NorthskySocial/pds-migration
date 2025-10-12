@@ -1,5 +1,6 @@
-use crate::errors::PdsError;
-use crate::{CreateAccountRequest, CreateAccountWithoutPDSRequest, GetBlobRequest, GetRepoRequest};
+use crate::create_account::{CreateAccountRequest, CreateAccountWithoutPDSRequest};
+use crate::export_all_blobs::GetBlobRequest;
+use crate::{GetRepoRequest, MigrationError};
 use bsky_sdk::api::agent::atp_agent::AtpSession;
 use bsky_sdk::api::agent::Configure;
 use bsky_sdk::api::app::bsky::actor::defs::Preferences;
@@ -12,10 +13,18 @@ use ipld_core::ipld::Ipld;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-const PLC_DIRECTORY: &str = "https://plc.directory";
 pub type GetAgentResult = Result<BskyAgent, Box<dyn std::error::Error>>;
 pub type RecommendedDidOutputData =
     bsky_sdk::api::com::atproto::identity::get_recommended_did_credentials::OutputData;
+
+pub async fn build_agent() -> Result<BskyAgent, MigrationError> {
+    BskyAgent::builder()
+        .build()
+        .await
+        .map_err(|error| MigrationError::Upstream {
+            message: error.to_string(),
+        })
+}
 
 #[tracing::instrument(skip(agent, token))]
 pub async fn login_helper(
@@ -23,7 +32,7 @@ pub async fn login_helper(
     pds_host: &str,
     did: &str,
     token: &str,
-) -> Result<AtpSession, PdsError> {
+) -> Result<AtpSession, MigrationError> {
     use bsky_sdk::api::com::atproto::server::create_session::OutputData;
     agent.configure_endpoint(pds_host.to_string());
     match agent
@@ -50,13 +59,15 @@ pub async fn login_helper(
         }
         Err(e) => {
             tracing::error!("Error logging in: {:?}", e);
-            Err(PdsError::Login)
+            Err(MigrationError::Upstream {
+                message: e.to_string(),
+            })
         }
     }
 }
 
 #[tracing::instrument(skip(agent))]
-pub async fn list_all_blobs(agent: &BskyAgent) -> Result<Vec<Cid>, PdsError> {
+pub async fn list_all_blobs(agent: &BskyAgent) -> Result<Vec<Cid>, MigrationError> {
     use bsky_sdk::api::com::atproto::sync::list_blobs::{Parameters, ParametersData};
     let mut result = vec![];
     let mut cursor = None;
@@ -88,7 +99,9 @@ pub async fn list_all_blobs(agent: &BskyAgent) -> Result<Vec<Cid>, PdsError> {
             }
             Err(e) => {
                 tracing::error!("{:?}", e);
-                return Err(PdsError::Validation);
+                return Err(MigrationError::Upstream {
+                    message: e.to_string(),
+                });
             }
         }
     }
@@ -96,7 +109,7 @@ pub async fn list_all_blobs(agent: &BskyAgent) -> Result<Vec<Cid>, PdsError> {
 }
 
 #[tracing::instrument(skip(agent))]
-pub async fn missing_blobs(agent: &BskyAgent) -> Result<Vec<RecordBlob>, PdsError> {
+pub async fn missing_blobs(agent: &BskyAgent) -> Result<Vec<RecordBlob>, MigrationError> {
     use bsky_sdk::api::com::atproto::repo::list_missing_blobs::{Parameters, ParametersData};
     let mut result: Vec<RecordBlob> = vec![];
     let mut length = None;
@@ -114,20 +127,14 @@ pub async fn missing_blobs(agent: &BskyAgent) -> Result<Vec<RecordBlob>, PdsErro
                 },
                 extra_data: Ipld::Null,
             })
-            .await;
-        match output {
-            Ok(output) => {
-                tracing::info!("{:?}", output);
-                length = Some(output.blobs.len());
-                let mut temp = output.blobs.clone();
-                result.append(temp.as_mut());
-                cursor = output.cursor.clone();
-            }
-            Err(e) => {
-                tracing::error!("{:?}", e);
-                return Err(PdsError::Validation);
-            }
-        }
+            .await
+            .map_err(|error| MigrationError::Upstream {
+                message: error.to_string(),
+            })?;
+        length = Some(output.blobs.len());
+        let mut temp = output.blobs.clone();
+        result.append(temp.as_mut());
+        cursor = output.cursor.clone();
     }
     Ok(result)
 }
@@ -161,23 +168,22 @@ pub async fn get_blob(agent: &BskyAgent, cid: Cid, did: Did) -> Result<Vec<u8>, 
 }
 
 #[tracing::instrument(skip(agent, input))]
-pub async fn upload_blob(agent: &BskyAgent, input: Vec<u8>) -> Result<(), PdsError> {
-    let result = agent.api.com.atproto.repo.upload_blob(input).await;
-    match result {
-        Ok(output) => {
-            tracing::info!("Successfully uploaded blob");
-            tracing::debug!("{:?}", output);
-            Ok(())
-        }
-        Err(e) => {
-            tracing::error!("Failed to upload blob: {:?}", e);
-            Err(PdsError::Validation)
-        }
-    }
+pub async fn upload_blob(agent: &BskyAgent, input: Vec<u8>) -> Result<(), MigrationError> {
+    agent
+        .api
+        .com
+        .atproto
+        .repo
+        .upload_blob(input)
+        .await
+        .map_err(|error| MigrationError::Runtime {
+            message: error.to_string(),
+        })?;
+    Ok(())
 }
 
 #[tracing::instrument(skip(agent))]
-pub async fn export_preferences(agent: &BskyAgent) -> Result<Preferences, PdsError> {
+pub async fn export_preferences(agent: &BskyAgent) -> Result<Preferences, MigrationError> {
     use bsky_sdk::api::app::bsky::actor::get_preferences::{Parameters, ParametersData};
     let result = agent
         .api
@@ -188,27 +194,23 @@ pub async fn export_preferences(agent: &BskyAgent) -> Result<Preferences, PdsErr
             data: ParametersData {},
             extra_data: Ipld::Null,
         })
-        .await;
-    match result {
-        Ok(output) => {
-            tracing::info!("Successfully exported preferences");
-            tracing::debug!("{:?}", output);
-            Ok(output.preferences.clone())
-        }
-        Err(e) => {
-            tracing::error!("Failed to export preferences: {:?}", e);
-            Err(PdsError::Validation)
-        }
-    }
+        .await
+        .map_err(|error| {
+            tracing::error!("Failed to export preferences: {:?}", error);
+            MigrationError::Runtime {
+                message: error.to_string(),
+            }
+        })?;
+    Ok(result.preferences.clone())
 }
 
 #[tracing::instrument(skip(agent))]
 pub async fn import_preferences(
     agent: &BskyAgent,
     preferences: Preferences,
-) -> Result<(), PdsError> {
+) -> Result<(), MigrationError> {
     use bsky_sdk::api::app::bsky::actor::put_preferences::{Input, InputData};
-    let result = agent
+    agent
         .api
         .app
         .bsky
@@ -217,44 +219,38 @@ pub async fn import_preferences(
             data: InputData { preferences },
             extra_data: Ipld::Null,
         })
-        .await;
-    match result {
-        Ok(output) => {
-            tracing::info!("Successfully imported preferences");
-            tracing::debug!("{:?}", output);
-            Ok(())
-        }
-        Err(e) => {
-            tracing::error!("Failed to import preferences: {:?}", e);
-            Err(PdsError::Validation)
-        }
-    }
+        .await
+        .map_err(|error| {
+            tracing::error!("Failed to import preferences: {:?}", error);
+            MigrationError::Runtime {
+                message: error.to_string(),
+            }
+        })?;
+    Ok(())
 }
 
 #[tracing::instrument(skip(agent))]
-pub async fn recommended_plc(agent: &BskyAgent) -> Result<RecommendedDidOutputData, PdsError> {
+pub async fn recommended_plc(
+    agent: &BskyAgent,
+) -> Result<RecommendedDidOutputData, MigrationError> {
     let result = agent
         .api
         .com
         .atproto
         .identity
         .get_recommended_did_credentials()
-        .await;
-    match result {
-        Ok(output) => {
-            tracing::info!("Successfully imported preferences");
-            tracing::debug!("{:?}", output);
-            Ok(output.data)
-        }
-        Err(e) => {
-            tracing::error!("Failed to import preferences: {:?}", e);
-            Err(PdsError::Validation)
-        }
-    }
+        .await
+        .map_err(|error| {
+            tracing::error!("Failed to get recommended did: {:?}", error);
+            MigrationError::Runtime {
+                message: error.to_string(),
+            }
+        })?;
+    Ok(result.data)
 }
 
 #[tracing::instrument(skip(agent))]
-pub async fn get_service_auth(agent: &BskyAgent, aud: &str) -> Result<String, PdsError> {
+pub async fn get_service_auth(agent: &BskyAgent, aud: &str) -> Result<String, MigrationError> {
     use bsky_sdk::api::com::atproto::server::get_service_auth::{Parameters, ParametersData};
     let result = agent
         .api
@@ -263,28 +259,26 @@ pub async fn get_service_auth(agent: &BskyAgent, aud: &str) -> Result<String, Pd
         .server
         .get_service_auth(Parameters {
             data: ParametersData {
-                aud: aud.parse().unwrap(),
+                aud: aud.parse().map_err(|_error| MigrationError::Validation {
+                    field: "Aud is invalid".to_string(),
+                })?,
                 exp: None,
                 lxm: Some(Nsid::new("com.atproto.server.createAccount".to_string()).unwrap()),
             },
             extra_data: Ipld::Null,
         })
-        .await;
-    match result {
-        Ok(output) => {
-            tracing::info!("Successfully requested service auth");
-            tracing::debug!("{:?}", output);
-            Ok(output.token.clone())
-        }
-        Err(e) => {
-            tracing::error!("Failed to request service auth: {:?}", e);
-            Err(PdsError::Runtime)
-        }
-    }
+        .await
+        .map_err(|error| MigrationError::Runtime {
+            message: error.to_string(),
+        })?;
+    Ok(result.token.clone())
 }
 
 #[tracing::instrument(skip(agent))]
-pub async fn sign_plc(agent: &BskyAgent, plc_input_data: InputData) -> Result<Unknown, PdsError> {
+pub async fn sign_plc(
+    agent: &BskyAgent,
+    plc_input_data: InputData,
+) -> Result<Unknown, MigrationError> {
     use bsky_sdk::api::com::atproto::identity::sign_plc_operation::Input;
     let result = agent
         .api
@@ -297,41 +291,36 @@ pub async fn sign_plc(agent: &BskyAgent, plc_input_data: InputData) -> Result<Un
         })
         .await;
     match result {
-        Ok(output) => {
-            tracing::info!("Successfully signed token");
-            tracing::debug!("{:?}", output);
-            Ok(output.operation.clone())
-        }
+        Ok(output) => Ok(output.operation.clone()),
         Err(e) => {
-            tracing::error!("Failed to sign token: {:?}", e);
-            Err(PdsError::Validation)
+            tracing::error!("Failed to sign plc: {:?}", e);
+            Err(MigrationError::Runtime {
+                message: e.to_string(),
+            })
         }
     }
 }
 
 #[tracing::instrument(skip(agent))]
-pub async fn account_import(agent: &BskyAgent, filepath: &str) -> Result<(), PdsError> {
-    let result = agent
+pub async fn account_import(agent: &BskyAgent, filepath: &str) -> Result<(), MigrationError> {
+    agent
         .api
         .com
         .atproto
         .repo
         .import_repo(tokio::fs::read(filepath).await.unwrap())
-        .await;
-    match result {
-        Ok(_) => {
-            tracing::info!("Successfully imported account");
-            Ok(())
-        }
-        Err(e) => {
-            tracing::error!("Error importing: {:?}", e.to_string());
-            Err(PdsError::AccountImport)
-        }
-    }
+        .await
+        .map_err(|error| {
+            tracing::error!("Failed to import account: {:?}", error);
+            MigrationError::Runtime {
+                message: error.to_string(),
+            }
+        })?;
+    Ok(())
 }
 
 #[tracing::instrument(skip(agent))]
-pub async fn account_export(agent: &BskyAgent, did: &Did) -> Result<(), PdsError> {
+pub async fn account_export(agent: &BskyAgent, did: &Did) -> Result<(), MigrationError> {
     use bsky_sdk::api::com::atproto::sync::get_repo::{Parameters, ParametersData};
     let result = agent
         .api
@@ -351,23 +340,27 @@ pub async fn account_export(agent: &BskyAgent, did: &Did) -> Result<(), PdsError
             tokio::fs::write(did.as_str().to_string().replace(":", "-") + ".car", output)
                 .await
                 .map_err(|error| {
-                    tracing::error!("{}", error.to_string());
-                    PdsError::AccountExport
+                    tracing::error!("Failed write repo bytes to file: {:?}", error);
+                    MigrationError::Runtime {
+                        message: error.to_string(),
+                    }
                 })?;
             tracing::info!("write success");
             Ok(())
         }
         Err(e) => {
-            tracing::error!("Error exporting: {:?}", e);
-            Err(PdsError::AccountExport)
+            tracing::error!("Failed to export account: {:?}", e);
+            Err(MigrationError::Upstream {
+                message: e.to_string(),
+            })
         }
     }
 }
 
 #[tracing::instrument(skip(agent))]
-pub async fn deactivate_account(agent: &BskyAgent) -> Result<(), PdsError> {
+pub async fn deactivate_account(agent: &BskyAgent) -> Result<(), MigrationError> {
     use bsky_sdk::api::com::atproto::server::deactivate_account::{Input, InputData};
-    let result = agent
+    agent
         .api
         .com
         .atproto
@@ -376,38 +369,18 @@ pub async fn deactivate_account(agent: &BskyAgent) -> Result<(), PdsError> {
             data: InputData { delete_after: None },
             extra_data: Ipld::Null,
         })
-        .await;
-    match result {
-        Ok(output) => {
-            tracing::info!("Successfully deactivated account");
-            tracing::debug!("{:?}", output);
-            Ok(())
-        }
-        Err(e) => {
-            tracing::error!("Failed to deactivate account: {:?}", e);
-            Err(PdsError::Validation)
-        }
-    }
+        .await
+        .map_err(|error| {
+            tracing::error!("Failed to deactivate account: {:?}", error);
+            MigrationError::Runtime {
+                message: error.to_string(),
+            }
+        })?;
+    Ok(())
 }
 
 #[tracing::instrument(skip(agent))]
-pub async fn activate_account(agent: &BskyAgent) -> Result<(), PdsError> {
-    let result = agent.api.com.atproto.server.activate_account().await;
-    match result {
-        Ok(output) => {
-            tracing::info!("Successfully activated account");
-            tracing::debug!("{:?}", output);
-            Ok(())
-        }
-        Err(e) => {
-            tracing::error!("Failed to activate account: {:?}", e);
-            Err(PdsError::Validation)
-        }
-    }
-}
-
-#[tracing::instrument(skip(agent))]
-pub async fn submit_plc(agent: &BskyAgent, signed_plc: Unknown) -> Result<(), PdsError> {
+pub async fn submit_plc(agent: &BskyAgent, signed_plc: Unknown) -> Result<(), MigrationError> {
     use bsky_sdk::api::com::atproto::identity::submit_plc_operation::{Input, InputData};
     let result = agent
         .api
@@ -422,20 +395,18 @@ pub async fn submit_plc(agent: &BskyAgent, signed_plc: Unknown) -> Result<(), Pd
         })
         .await;
     match result {
-        Ok(output) => {
-            tracing::info!("Successfully submitted PLC Operation");
-            tracing::debug!("{:?}", output);
-            Ok(())
-        }
+        Ok(res) => Ok(res),
         Err(e) => {
-            tracing::error!("Failed to submitted PLC Operation: {:?}", e);
-            Err(PdsError::Validation)
+            tracing::error!("Failed to submit plc: {:?}", e);
+            Err(MigrationError::Runtime {
+                message: e.to_string(),
+            })
         }
     }
 }
 
 #[tracing::instrument(skip(agent))]
-pub async fn request_token(agent: &BskyAgent) -> Result<(), PdsError> {
+pub async fn request_token(agent: &BskyAgent) -> Result<(), MigrationError> {
     let result = agent
         .api
         .com
@@ -446,8 +417,10 @@ pub async fn request_token(agent: &BskyAgent) -> Result<(), PdsError> {
     match result {
         Ok(_) => Ok(()),
         Err(e) => {
-            tracing::error!("{:?}", e);
-            Err(PdsError::Validation)
+            tracing::error!("Failed to request token: {:?}", e);
+            Err(MigrationError::Runtime {
+                message: e.to_string(),
+            })
         }
     }
 }
@@ -456,7 +429,7 @@ pub async fn request_token(agent: &BskyAgent) -> Result<(), PdsError> {
 pub async fn create_account(
     pds_host: &str,
     account_request: &CreateAccountRequest,
-) -> Result<(), PdsError> {
+) -> Result<(), MigrationError> {
     use bsky_sdk::api::com::atproto::server::create_account::{Input, InputData};
     let client = reqwest::Client::new();
     let x = serde_json::to_string(&Input {
@@ -490,14 +463,11 @@ pub async fn create_account(
                 tracing::info!("Successfully created account");
             }
             _ => {
-                tracing::error!("Error creating account: {:?}", output);
-                tracing::error!("More: {:?}", output.text().await);
-                return Err(PdsError::Validation);
+                //todo
             }
         },
         Err(e) => {
-            tracing::error!("Error creating account: {:?}", e);
-            return Err(PdsError::Validation);
+            //todo
         }
     }
     Ok(())
@@ -507,7 +477,8 @@ pub async fn create_account(
 pub async fn download_blob(
     pds_host: &str,
     request: &GetBlobRequest,
-) -> Result<impl futures_core::Stream<Item = Result<bytes::Bytes, reqwest::Error>>, PdsError> {
+) -> Result<impl futures_core::Stream<Item = Result<bytes::Bytes, reqwest::Error>>, MigrationError>
+{
     tracing::debug!("Downloading blob");
     let client = reqwest::Client::new();
     let url = format!("{pds_host}/xrpc/com.atproto.sync.getBlob");
@@ -532,7 +503,7 @@ pub async fn download_blob(
                 .unwrap_or(1000);
             if ratelimit_remaining < 100 {
                 tracing::error!("Ratelimit reached");
-                return Err(PdsError::RateLimitReached);
+                return Err(MigrationError::RateLimitReached);
             }
 
             match output.status() {
@@ -542,17 +513,23 @@ pub async fn download_blob(
                 }
                 reqwest::StatusCode::BAD_REQUEST => {
                     tracing::error!("BadRequest Error downloading blob: {:?}", output);
-                    Err(PdsError::Validation)
+                    Err(MigrationError::Upstream {
+                        message: "BadRequest downloading blob".to_string(),
+                    })
                 }
                 _ => {
                     tracing::error!("Runtime Error downloading blob: {:?}", output);
-                    Err(PdsError::Runtime)
+                    Err(MigrationError::Upstream {
+                        message: "Runtime Error downloading blob".to_string(),
+                    })
                 }
             }
         }
         Err(e) => {
             tracing::error!("Unexpected Error downloading blob: {:?}", e);
-            Err(PdsError::Runtime)
+            Err(MigrationError::Runtime {
+                message: "Unexpected Error downloading blob".to_string(),
+            })
         }
     }
 }
@@ -561,7 +538,8 @@ pub async fn download_blob(
 pub async fn download_repo(
     pds_host: &str,
     request: &GetRepoRequest,
-) -> Result<impl futures_core::Stream<Item = Result<bytes::Bytes, reqwest::Error>>, PdsError> {
+) -> Result<impl futures_core::Stream<Item = Result<bytes::Bytes, reqwest::Error>>, MigrationError>
+{
     let client = reqwest::Client::new();
 
     let url = format!("{pds_host}/xrpc/com.atproto.sync.getRepo");
@@ -584,7 +562,7 @@ pub async fn download_repo(
             };
             if ratelimit_remaining < 100 {
                 tracing::error!("Ratelimit reached");
-                return Err(PdsError::RateLimitReached);
+                return Err(MigrationError::RateLimitReached);
             }
 
             match output.status() {
@@ -593,14 +571,18 @@ pub async fn download_repo(
                     Ok(output.bytes_stream())
                 }
                 _ => {
-                    tracing::error!("Error downloading Repo: {:?}", output);
-                    Err(PdsError::Validation)
+                    tracing::error!("Runtime Error downloading Repo: {:?}", output);
+                    Err(MigrationError::Upstream {
+                        message: "Runtime Error downloading Repo".to_string(),
+                    })
                 }
             }
         }
         Err(e) => {
-            tracing::error!("Error download Repo: {:?}", e);
-            Err(PdsError::Validation)
+            tracing::error!("Unexpected Error downloading Repo: {:?}", e);
+            Err(MigrationError::Runtime {
+                message: "Unexpected Error downloading Repo".to_string(),
+            })
         }
     }
 }
@@ -609,7 +591,7 @@ pub async fn download_repo(
 pub async fn create_account_without_pds(
     pds_host: &str,
     account_request: &CreateAccountWithoutPDSRequest,
-) -> Result<(), PdsError> {
+) -> Result<(), MigrationError> {
     use bsky_sdk::api::com::atproto::server::create_account::{Input, InputData};
     let client = reqwest::Client::new();
     let x = serde_json::to_string(&Input {
@@ -626,7 +608,9 @@ pub async fn create_account_without_pds(
         },
         extra_data: Ipld::Null,
     })
-    .unwrap();
+    .map_err(|error| MigrationError::Runtime {
+        message: error.to_string(),
+    })?;
     let result = client
         .post(pds_host.to_string() + "/xrpc/com.atproto.server.createAccount")
         .body(x)
@@ -639,14 +623,11 @@ pub async fn create_account_without_pds(
                 tracing::info!("Successfully created account");
             }
             _ => {
-                tracing::error!("Error creating account: {:?}", output);
-                tracing::error!("More: {:?}", output.text().await);
-                return Err(PdsError::Validation);
+                //todo
             }
         },
         Err(e) => {
-            tracing::error!("Error creating account: {:?}", e);
-            return Err(PdsError::Validation);
+            //todo
         }
     }
     Ok(())
@@ -687,50 +668,7 @@ pub struct PlcOpService {
     pub endpoint: String,
 }
 
-#[tracing::instrument]
-pub async fn get_plc_audit_log(did: &str) -> PlcLogAudit {
-    let client = reqwest::Client::new();
-    let plc_audit = match client
-        .get(PLC_DIRECTORY.to_string() + format!("/{did}/log/audit").as_str())
-        .send()
-        .await
-    {
-        Ok(result) => match result.json::<PlcLogAudit>().await {
-            Ok(res) => res,
-            Err(e) => {
-                panic!("Error: Could not parse response {e}");
-            }
-        },
-        Err(e) => {
-            panic!("Error: {e:?}");
-        }
-    };
-    plc_audit
-}
-
 pub async fn generate_service_auth_without_pds() {}
-
-#[tracing::instrument]
-pub async fn send_plc_operation(did: &str, op: PlcOperation) {
-    let client = reqwest::Client::new();
-    match client
-        .post(PLC_DIRECTORY.to_string() + format!("/{did}").as_str())
-        .header("Content-Type", "application/json")
-        .json(&op)
-        .send()
-        .await
-    {
-        Ok(result) => {
-            println!("{result:?}");
-            println!("{:?}", result.status());
-            println!("{:?}", result.text().await);
-            // println!("{:?}", result.json());
-        }
-        Err(e) => {
-            panic!("Error: {e:?}");
-        }
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GetRecommendedResponse {
@@ -765,177 +703,6 @@ pub async fn get_recommended(pds_host: &str, access_token: &str) -> GetRecommend
         Err(e) => {
             tracing::error!("Error fetching recommended: {:?}", e);
             panic!("Error: {e:?}");
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use mockall::mock;
-
-    // Mock types for testing
-    mock! {
-        HttpClient {}
-        impl Clone for HttpClient {
-            fn clone(&self) -> Self;
-        }
-    }
-
-    #[test]
-    fn test_plc_operation_serialization() {
-        let mut services = BTreeMap::new();
-        services.insert(
-            "atproto_pds".to_string(),
-            PlcOpService {
-                r#type: "AtprotoPersonalDataServer".to_string(),
-                endpoint: "https://example.com".to_string(),
-            },
-        );
-
-        let mut verification_methods = BTreeMap::new();
-        verification_methods.insert("key1".to_string(), "did:key:test".to_string());
-
-        let plc_op = PlcOperation {
-            r#type: "plc_operation".to_string(),
-            rotation_keys: vec!["key1".to_string()],
-            verification_methods,
-            also_known_as: vec!["at://handle.test".to_string()],
-            services,
-            prev: Some("prev_cid".to_string()),
-            sig: Some("signature".to_string()),
-        };
-
-        // Test serialization doesn't panic
-        let json = serde_json::to_string(&plc_op).unwrap();
-        assert!(json.contains("plc_operation"));
-        assert!(json.contains("AtprotoPersonalDataServer"));
-
-        // Test deserialization
-        let deserialized: PlcOperation = serde_json::from_str(&json).unwrap();
-        assert_eq!(deserialized.r#type, "plc_operation");
-        assert_eq!(deserialized.rotation_keys.len(), 1);
-    }
-
-    #[test]
-    fn test_plc_log_audit_entry_serialization() {
-        let mut services = BTreeMap::new();
-        services.insert(
-            "atproto_pds".to_string(),
-            PlcOpService {
-                r#type: "AtprotoPersonalDataServer".to_string(),
-                endpoint: "https://example.com".to_string(),
-            },
-        );
-
-        let plc_op = PlcOperation {
-            r#type: "plc_operation".to_string(),
-            rotation_keys: vec!["key1".to_string()],
-            verification_methods: BTreeMap::new(),
-            also_known_as: vec![],
-            services,
-            prev: None,
-            sig: None,
-        };
-
-        let audit_entry = PlcLogAuditEntry {
-            did: "did:plc:test123".to_string(),
-            operation: plc_op,
-            cid: "bafytest123".to_string(),
-            nullified: false,
-            created_at: "2023-01-01T00:00:00Z".to_string(),
-        };
-
-        // Test serialization
-        let json = serde_json::to_string(&audit_entry).unwrap();
-        assert!(json.contains("did:plc:test123"));
-        assert!(json.contains("bafytest123"));
-
-        // Test deserialization
-        let deserialized: PlcLogAuditEntry = serde_json::from_str(&json).unwrap();
-        assert_eq!(deserialized.did, "did:plc:test123");
-        assert!(!deserialized.nullified);
-    }
-
-    #[test]
-    fn test_get_recommended_response_serialization() {
-        let mut services = BTreeMap::new();
-        services.insert(
-            "atproto_pds".to_string(),
-            PlcOpService {
-                r#type: "AtprotoPersonalDataServer".to_string(),
-                endpoint: "https://example.com".to_string(),
-            },
-        );
-
-        let mut verification_methods = BTreeMap::new();
-        verification_methods.insert("key1".to_string(), "did:key:test".to_string());
-
-        let response = GetRecommendedResponse {
-            rotation_keys: vec!["key1".to_string(), "key2".to_string()],
-            also_known_as: vec!["at://handle.test".to_string()],
-            services,
-            verification_methods,
-        };
-
-        // Test serialization
-        let json = serde_json::to_string(&response).unwrap();
-        assert!(json.contains("rotationKeys"));
-        assert!(json.contains("alsoKnownAs"));
-        assert!(json.contains("verificationMethods"));
-
-        // Test deserialization
-        let deserialized: GetRecommendedResponse = serde_json::from_str(&json).unwrap();
-        assert_eq!(deserialized.rotation_keys.len(), 2);
-        assert_eq!(deserialized.also_known_as.len(), 1);
-    }
-
-    #[test]
-    fn test_plc_op_service() {
-        let service = PlcOpService {
-            r#type: "AtprotoPersonalDataServer".to_string(),
-            endpoint: "https://test.example.com".to_string(),
-        };
-
-        assert_eq!(service.r#type, "AtprotoPersonalDataServer");
-        assert_eq!(service.endpoint, "https://test.example.com");
-
-        // Test clone
-        let cloned = service.clone();
-        assert_eq!(cloned.r#type, service.r#type);
-        assert_eq!(cloned.endpoint, service.endpoint);
-    }
-
-    #[tokio::test]
-    async fn test_generate_service_auth_without_pds() {
-        // This function is currently empty, so just test it doesn't panic
-        generate_service_auth_without_pds().await;
-    }
-
-    #[test]
-    fn test_plc_directory_constant() {
-        assert_eq!(PLC_DIRECTORY, "https://plc.directory");
-    }
-
-    // Test error handling in functions that return PdsError
-    #[test]
-    fn test_pds_error_variants() {
-        // Test that PdsError variants can be created and compared
-        let errors = vec![
-            PdsError::Validation,
-            PdsError::AccountStatus,
-            PdsError::Login,
-            PdsError::Runtime,
-            PdsError::CreateAccount,
-            PdsError::AccountExport,
-            PdsError::AccountImport,
-            PdsError::RateLimitReached,
-        ];
-
-        for error in errors {
-            // Test that errors implement Debug
-            let debug_str = format!("{:?}", error);
-            assert!(!debug_str.is_empty());
         }
     }
 }

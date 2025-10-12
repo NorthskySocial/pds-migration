@@ -10,13 +10,10 @@ use bsky_sdk::BskyAgent;
 use hex::ToHex;
 use indexmap::IndexMap;
 use multibase::Base::Base58Btc;
-use pdsmigration_common::agent::PlcOperation;
-use pdsmigration_common::errors::PdsError;
 use pdsmigration_common::{
-    ActivateAccountRequest, CreateAccountApiRequest, DeactivateAccountRequest,
-    ExportAllBlobsRequest, ExportBlobsRequest, ExportPDSRequest, ImportPDSRequest,
-    MigratePlcRequest, MigratePreferencesRequest, RequestTokenRequest, ServiceAuthRequest,
-    UploadBlobsRequest,
+    CreateAccountRequest, DeactivateAccountRequest, ExportAllBlobsRequest, ExportBlobsRequest,
+    ExportPDSRequest, ImportPDSRequest, MigratePlcRequest, MigratePreferencesRequest,
+    MigrationError, PlcOperation, RequestTokenRequest, ServiceAuthRequest, UploadBlobsRequest,
 };
 use rand::distr::Alphanumeric;
 use rand::Rng;
@@ -66,12 +63,9 @@ pub async fn activate_account(session_config: SessionConfig) -> Result<(), GuiEr
     let did = session_config.did().to_string();
 
     tracing::info!("Activating Account started");
-    let request = ActivateAccountRequest {
-        pds_host,
-        did,
-        token,
-    };
-    match pdsmigration_common::activate_account_api(request).await {
+    match pdsmigration_common::activate_account(pds_host.as_str(), token.as_str(), did.as_str())
+        .await
+    {
         Ok(_) => {
             tracing::info!("Activating Account completed");
             Ok(())
@@ -420,7 +414,7 @@ pub async fn export_all_blobs(pds_session: PdsSession) -> Result<(), GuiError> {
             Ok(())
         }
         Err(pds_error) => match pds_error {
-            PdsError::Validation => {
+            MigrationError::Validation { .. } => {
                 tracing::error!(
                     "Error exporting all blobs, validation error: {:?}",
                     pds_error
@@ -475,10 +469,11 @@ pub async fn export_missing_blobs(pds_session: PdsSession) -> Result<(), GuiErro
     match pdsmigration_common::export_blobs_api(request).await {
         Ok(_) => {
             tracing::info!("Exporting Missing Blobs completed");
+            //TODO add a check for failed blobs
             Ok(())
         }
         Err(pds_error) => match pds_error {
-            PdsError::Validation => {
+            MigrationError::Validation { .. } => {
                 tracing::error!(
                     "Error exporting missing blobs, validation error: {:?}",
                     pds_error
@@ -557,16 +552,17 @@ pub async fn export_repo(pds_session: PdsSession) -> Result<(), GuiError> {
         token,
     };
     match pdsmigration_common::export_pds_api(request).await {
-        Ok(_) => {
+        Ok(res) => {
             tracing::info!("Exporting Repo completed");
             Ok(())
         }
         Err(pds_error) => {
             tracing::error!("Error exporting repo: {:?}", pds_error);
             match pds_error {
-                PdsError::Login => Err(GuiError::InvalidLogin),
-                PdsError::Runtime => Err(GuiError::Runtime),
-                PdsError::AccountExport => Err(GuiError::Other),
+                //todo
+                // MigrationError::Login => Err(GuiError::InvalidLogin),
+                // MigrationError::Runtime => Err(GuiError::Runtime),
+                // MigrationError::AccountExport => Err(GuiError::Other),
                 _ => Err(GuiError::Other),
             }
         }
@@ -599,21 +595,12 @@ pub async fn export_blobs(pds_session: PdsSession) -> Result<(), GuiError> {
         did,
         token,
     };
-    match pdsmigration_common::export_pds_api(request).await {
-        Ok(_) => {
-            tracing::info!("Exporting Repo completed");
-            Ok(())
-        }
-        Err(pds_error) => {
-            tracing::error!("Error exporting repo: {:?}", pds_error);
-            match pds_error {
-                PdsError::Login => Err(GuiError::InvalidLogin),
-                PdsError::Runtime => Err(GuiError::Runtime),
-                PdsError::AccountExport => Err(GuiError::Other),
-                _ => Err(GuiError::Other),
-            }
-        }
-    }
+    pdsmigration_common::export_pds_api(request)
+        .await
+        .map_err(|error| {
+            tracing::error!("Error exporting repo: {:?}", error);
+            GuiError::Other
+        })
 }
 
 pub struct DescribePDS {
@@ -724,99 +711,28 @@ pub async fn create_account(parameters: CreateAccountParameters) -> Result<PdsSe
         }
     };
 
-    let create_account_request = CreateAccountApiRequest {
-        email,
-        handle: handle.clone(),
-        invite_code,
-        password: password.clone(),
-        token: service_token,
-        pds_host: new_pds_host.clone(),
+    let did = did
+        .parse()
+        .map_err(|error| MigrationError::Validation {
+            field: "did".to_string(),
+        })
+        .unwrap();
+
+    let handle = handle.trim().to_string();
+    let create_account_request = CreateAccountRequest {
         did,
+        email: Some(email.clone()),
+        handle: handle.clone(),
+        invite_code: Some(invite_code.trim().to_string()),
+        password: Some(password.clone()),
         recovery_key: None,
+        verification_code: Some(String::from("")),
+        verification_phone: None,
+        plc_op: None,
+        token: Some(service_token.clone()),
     };
-    match pdsmigration_common::create_account_api(create_account_request).await {
-        Ok(_) => {
-            tracing::info!("Creating Account completed");
-            let bsky_agent = BskyAgent::builder().build().await.unwrap();
-            match login_helper2(
-                &bsky_agent,
-                new_pds_host.as_str(),
-                handle.as_str(),
-                password.as_str(),
-            )
-            .await
-            {
-                Ok(res) => {
-                    tracing::info!("Login successful");
-                    let access_token = res.access_jwt.clone();
-                    let refresh_token = res.refresh_jwt.clone();
-                    let did = res.did.as_str().to_string();
-                    pds_session.create_new_session(
-                        did.as_str(),
-                        access_token.as_str(),
-                        refresh_token.as_str(),
-                        new_pds_host.as_str(),
-                    );
-                    Ok(pds_session)
-                }
-                Err(e) => {
-                    tracing::error!("Error logging in: {e}");
-                    Err(GuiError::Other)
-                }
-            }
-        }
-        Err(pds_error) => {
-            tracing::error!("Error creating account: {pds_error}");
-            Err(GuiError::Runtime)
-        }
-    }
-}
-
-#[tracing::instrument(skip(parameters))]
-pub async fn gener(parameters: CreateAccountParameters) -> Result<PdsSession, GuiError> {
-    let mut pds_session = parameters.pds_session.clone();
-    let old_session_config = match &pds_session.old_session_config() {
-        None => return Err(GuiError::Other),
-        Some(session_config) => session_config.clone(),
-    };
-    let did = match pds_session.did().clone() {
-        None => return Err(GuiError::Other),
-        Some(did) => did.to_string(),
-    };
-    let email = parameters.new_email.clone();
-    let new_pds_host = parameters.new_pds_host.clone();
-    let aud = new_pds_host.replace("https://", "did:web:");
-
-    let password = parameters.new_password.clone();
-    let invite_code = parameters.invite_code.clone();
-    let handle = parameters.new_handle.clone();
-    tracing::info!("Creating Account started");
-    let service_auth_request = ServiceAuthRequest {
-        pds_host: old_session_config.host().to_string(),
-        aud,
-        did: did.clone(),
-        token: old_session_config.access_token().to_string(),
-    };
-    let service_token = match pdsmigration_common::get_service_auth_api(service_auth_request).await
+    match pdsmigration_common::create_account(new_pds_host.as_str(), &create_account_request).await
     {
-        Ok(res) => res,
-        Err(_pds_error) => {
-            tracing::error!("Error getting service auth token");
-            return Err(GuiError::Runtime);
-        }
-    };
-
-    let create_account_request = CreateAccountApiRequest {
-        email,
-        handle: handle.clone(),
-        invite_code,
-        password: password.clone(),
-        token: service_token,
-        pds_host: new_pds_host.clone(),
-        did,
-        recovery_key: None,
-    };
-    match pdsmigration_common::create_account_api(create_account_request).await {
         Ok(_) => {
             tracing::info!("Creating Account completed");
             let bsky_agent = BskyAgent::builder().build().await.unwrap();
