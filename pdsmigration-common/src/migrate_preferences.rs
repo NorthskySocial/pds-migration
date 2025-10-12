@@ -1,5 +1,4 @@
-use crate::agent::{export_preferences, import_preferences, login_helper};
-use crate::{build_agent, MigrationError};
+use crate::{build_agent, export_preferences, import_preferences, login_helper, MigrationError};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]

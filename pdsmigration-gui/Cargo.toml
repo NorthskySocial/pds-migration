@@ -9,6 +9,7 @@ include = [
 
 [dependencies]
 pdsmigration-common = { workspace = true }
+derive_more = { version = "2.0.1", features = ["display"] }
 bsky-sdk = "0.1.20"
 egui = { version = "0.29.0" }
 eframe = { version = "0.29", features = ["glow", "wgpu"] }
