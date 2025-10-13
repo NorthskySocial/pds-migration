@@ -10,10 +10,11 @@ use crate::api::{
 use crate::config::AppConfig;
 use actix_web::dev::Server;
 use actix_web::web::Json;
-use actix_web::{middleware, post, web, App, HttpResponse, HttpServer};
+use actix_web::{post, web, App, HttpResponse, HttpServer};
 use actix_web_prom::PrometheusMetricsBuilder;
 use dotenvy::dotenv;
 use std::io;
+use tracing_actix_web::TracingLogger;
 
 pub const APPLICATION_JSON: &str = "application/json";
 
@@ -26,8 +27,8 @@ fn init_http_server(app_config: AppConfig) -> io::Result<Server> {
         .expect("Failed to build prometheus metrics");
     let server = HttpServer::new(move || {
         App::new()
-            .wrap(middleware::Logger::default())
             .wrap(prometheus.clone())
+            .wrap(TracingLogger::default())
             .app_data(web::Data::new(app_config.clone()))
             .service(request_token_api)
             .service(create_account_api)

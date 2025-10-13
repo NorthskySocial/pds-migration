@@ -376,12 +376,18 @@ impl CreateOrLoginAccount {
                     let did = res.did.as_str().to_string();
                     {
                         let mut pds_session = pds_session_lock.write().await;
-                        pds_session.create_new_session(
-                            did.as_str(),
-                            access_token.as_str(),
-                            refresh_token.as_str(),
-                            new_pds_host.as_str(),
-                        );
+                        if pds_session
+                            .create_new_session(
+                                did.as_str(),
+                                access_token.as_str(),
+                                refresh_token.as_str(),
+                                new_pds_host.as_str(),
+                            )
+                            .is_err()
+                        {
+                            let mut error = error_lock.write().await;
+                            error.push(GuiError::Other);
+                        }
                     }
                     let pds_migration_step = {
                         let value = pds_migration_step_lock.read().await;

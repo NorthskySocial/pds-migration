@@ -4,6 +4,8 @@ use derive_more::{Display, Error};
 pub enum MigrationError {
     #[display("Validation error on field: {field}")]
     Validation { field: String },
+    #[display("Authentication error")]
+    Authentication { message: String },
     #[display("Upstream error: {message}")]
     Upstream { message: String },
     #[display("Unexpected error occurred: {message}")]

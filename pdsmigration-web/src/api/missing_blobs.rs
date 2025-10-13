@@ -7,6 +7,7 @@ use pdsmigration_common::MissingBlobsRequest;
 #[tracing::instrument(skip(req))]
 #[post("/missing-blobs")]
 pub async fn missing_blobs_api(req: Json<MissingBlobsRequest>) -> Result<HttpResponse, ApiError> {
+    tracing::info!("Missing blobs request received");
     let response = pdsmigration_common::missing_blobs_api(req.into_inner()).await?;
     Ok(HttpResponse::Ok()
         .content_type(APPLICATION_JSON)

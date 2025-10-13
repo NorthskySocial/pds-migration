@@ -12,6 +12,7 @@ license = "MIT"
 dotenvy = "0.15.7"
 actix-rt = "2.10.0"
 actix-web = "4.8.0"
+tracing-actix-web = "0.7.19"
 pdsmigration-common = {workspace = true}
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }

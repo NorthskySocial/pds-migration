@@ -11,6 +11,7 @@ pub async fn import_pds_api(
     req: Json<ImportPDSRequest>,
     config: Data<AppConfig>,
 ) -> Result<HttpResponse, ApiError> {
+    tracing::info!("Import repository request received");
     let endpoint_url = config.external_services.s3_endpoint.clone();
     let config = aws_config::from_env()
         .region("auto")

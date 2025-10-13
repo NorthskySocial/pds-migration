@@ -9,6 +9,7 @@ use pdsmigration_common::DeactivateAccountRequest;
 pub async fn deactivate_account_api(
     req: Json<DeactivateAccountRequest>,
 ) -> Result<HttpResponse, ApiError> {
+    tracing::info!("Deactivate account request received");
     pdsmigration_common::deactivate_account_api(req.into_inner())
         .await
         .map_err(|e| {

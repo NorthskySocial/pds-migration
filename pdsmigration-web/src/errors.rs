@@ -19,6 +19,8 @@ pub enum ApiError {
     Upstream { message: String },
     #[display("Unexpected error occurred: {message}")]
     Runtime { message: String },
+    #[display("Authentication error: {message}")]
+    Authentication { message: String },
 }
 
 impl ResponseError for ApiError {
@@ -27,21 +29,16 @@ impl ResponseError for ApiError {
             ApiError::Validation { .. } => StatusCode::BAD_REQUEST,
             ApiError::Upstream { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             ApiError::Runtime { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+            ApiError::Authentication { .. } => StatusCode::UNAUTHORIZED,
         }
     }
 
     fn error_response(&self) -> HttpResponse {
         let (code, message) = match self {
-            ApiError::Validation { field } => (
-                "VALIDATION_ERROR",
-                format!("Validation error on field: {}", field),
-            ),
-            ApiError::Upstream { message } => {
-                ("UPSTREAM_ERROR", format!("Upstream error: {}", message))
-            }
-            ApiError::Runtime { message } => {
-                ("RUNTIME_ERROR", format!("Unexpected error: {}", message))
-            }
+            ApiError::Validation { field } => ("VALIDATION_ERROR", field.to_string()),
+            ApiError::Upstream { message } => ("UPSTREAM_ERROR", message.to_string()),
+            ApiError::Runtime { message } => ("RUNTIME_ERROR", message.to_string()),
+            ApiError::Authentication { message } => ("AUTHENTICATION_ERROR", message.to_string()),
         };
 
         HttpResponse::build(self.status_code())
@@ -61,6 +58,9 @@ impl From<MigrationError> for ApiError {
             MigrationError::Runtime { message } => ApiError::Runtime { message },
             MigrationError::RateLimitReached => ApiError::Runtime {
                 message: "Rate limit reached. Please try again later.".to_string(),
+            },
+            MigrationError::Authentication { .. } => ApiError::Authentication {
+                message: "Authentication failed".to_string(),
             },
         }
     }

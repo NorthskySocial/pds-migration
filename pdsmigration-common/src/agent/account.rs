@@ -48,11 +48,15 @@ pub async fn create_account(
                 tracing::info!("Successfully created account");
             }
             _ => {
-                //todo
+                return Err(MigrationError::Runtime {
+                    message: "Failed to create account".to_string(),
+                });
             }
         },
         Err(e) => {
-            //todo
+            return Err(MigrationError::Runtime {
+                message: e.to_string(),
+            });
         }
     }
     Ok(())
@@ -93,11 +97,15 @@ pub async fn create_account_without_pds(
                 tracing::info!("Successfully created account");
             }
             _ => {
-                //todo
+                return Err(MigrationError::Runtime {
+                    message: "Failed to create account".to_string(),
+                });
             }
         },
         Err(e) => {
-            //todo
+            return Err(MigrationError::Runtime {
+                message: e.to_string(),
+            });
         }
     }
     Ok(())

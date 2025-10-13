@@ -7,6 +7,7 @@ use pdsmigration_common::{MigrationError, UploadBlobsRequest};
 #[tracing::instrument(skip(req))]
 #[post("/upload-blobs")]
 pub async fn upload_blobs_api(req: Json<UploadBlobsRequest>) -> Result<HttpResponse, ApiError> {
+    tracing::info!("Upload blobs request received");
     pdsmigration_common::upload_blobs_api(req.into_inner())
         .await
         .map_err(|e| {
@@ -24,6 +25,7 @@ pub async fn upload_blobs_api(req: Json<UploadBlobsRequest>) -> Result<HttpRespo
                 MigrationError::RateLimitReached => ApiError::Runtime {
                     message: "Unexpected error occurred".to_string(),
                 },
+                MigrationError::Authentication { message } => ApiError::Authentication { message },
             }
         })?;
     Ok(HttpResponse::Ok().finish())

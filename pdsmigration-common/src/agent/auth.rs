@@ -4,6 +4,7 @@ use crate::{
 use bsky_sdk::api::agent::atp_agent::AtpSession;
 use bsky_sdk::api::agent::Configure;
 use bsky_sdk::api::types::string::{Did, Handle, Nsid};
+use bsky_sdk::api::xrpc::Error;
 use bsky_sdk::BskyAgent;
 use ipld_core::ipld::Ipld;
 
@@ -16,7 +17,7 @@ pub async fn build_agent() -> Result<BskyAgent, MigrationError> {
         })
 }
 
-#[tracing::instrument(skip(agent, token))]
+#[tracing::instrument(skip(agent))]
 pub async fn login_helper(
     agent: &BskyAgent,
     pds_host: &str,
@@ -42,15 +43,28 @@ pub async fn login_helper(
         })
         .await
     {
-        Ok(_) => {
-            tracing::info!("Successfully logged in");
-            Ok(agent.get_session().await.unwrap())
-        }
-        Err(e) => {
-            tracing::error!("Error logging in: {:?}", e);
-            Err(MigrationError::Upstream {
-                message: e.to_string(),
-            })
+        Ok(_) => Ok(agent.get_session().await.unwrap()),
+        Err(error) => {
+            tracing::error!("Error while logging in: {}", error);
+            match error {
+                Error::Authentication(_) => Err(MigrationError::Authentication {
+                    message: error.to_string(),
+                }),
+                Error::XrpcResponse(ref error_response) => {
+                    if error_response.status.as_u16() == 401 {
+                        Err(MigrationError::Authentication {
+                            message: error.to_string(),
+                        })
+                    } else {
+                        Err(MigrationError::Upstream {
+                            message: error.to_string(),
+                        })
+                    }
+                }
+                _ => Err(MigrationError::Upstream {
+                    message: error.to_string(),
+                }),
+            }
         }
     }
 }

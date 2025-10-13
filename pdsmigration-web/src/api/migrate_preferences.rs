@@ -9,6 +9,7 @@ use pdsmigration_common::MigratePreferencesRequest;
 pub async fn migrate_preferences_api(
     req: Json<MigratePreferencesRequest>,
 ) -> Result<HttpResponse, ApiError> {
+    tracing::info!("Migrate preferences request received");
     pdsmigration_common::migrate_preferences_api(req.into_inner())
         .await
         .map_err(|e| {

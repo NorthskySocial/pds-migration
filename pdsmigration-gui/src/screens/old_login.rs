@@ -71,12 +71,19 @@ impl OldLogin {
                     let old_pds_refresh = res.refresh_jwt.clone();
                     let did = res.did.as_str().to_string();
                     let mut pds_session = pds_session.write().await;
-                    pds_session.create_old_session(
-                        did.as_str(),
-                        old_pds_token.as_str(),
-                        old_pds_refresh.as_str(),
-                        old_pds_host.as_str(),
-                    );
+                    if pds_session
+                        .create_old_session(
+                            did.as_str(),
+                            old_pds_token.as_str(),
+                            old_pds_refresh.as_str(),
+                            old_pds_host.as_str(),
+                        )
+                        .is_err()
+                    {
+                        tracing::error!("Unexpected error occurred");
+                        let mut error = error_lock.write().await;
+                        error.push(GuiError::Runtime);
+                    }
                     let mut page = page_lock.write().await;
                     *page = ScreenType::Basic;
                     drop(page)
@@ -123,12 +130,19 @@ impl OldLogin {
                     let old_pds_refresh = res.refresh_jwt.clone();
                     let did = res.did.as_str().to_string();
                     let mut pds_session = pds_session.write().await;
-                    pds_session.create_old_session(
-                        did.as_str(),
-                        old_pds_token.as_str(),
-                        old_pds_refresh.as_str(),
-                        old_pds_host.as_str(),
-                    );
+                    if pds_session
+                        .create_old_session(
+                            did.as_str(),
+                            old_pds_token.as_str(),
+                            old_pds_refresh.as_str(),
+                            old_pds_host.as_str(),
+                        )
+                        .is_err()
+                    {
+                        tracing::error!("Unexpected error occurred");
+                        let mut error = error_lock.write().await;
+                        error.push(GuiError::Runtime);
+                    }
                     let mut page = page_lock.write().await;
                     *page = ScreenType::Basic;
                     drop(page)

@@ -552,19 +552,13 @@ pub async fn export_repo(pds_session: PdsSession) -> Result<(), GuiError> {
         token,
     };
     match pdsmigration_common::export_pds_api(request).await {
-        Ok(res) => {
+        Ok(_res) => {
             tracing::info!("Exporting Repo completed");
             Ok(())
         }
         Err(pds_error) => {
             tracing::error!("Error exporting repo: {:?}", pds_error);
-            match pds_error {
-                //todo
-                // MigrationError::Login => Err(GuiError::InvalidLogin),
-                // MigrationError::Runtime => Err(GuiError::Runtime),
-                // MigrationError::AccountExport => Err(GuiError::Other),
-                _ => Err(GuiError::Other),
-            }
+            Err(GuiError::Other)
         }
     }
 }
@@ -713,7 +707,7 @@ pub async fn create_account(parameters: CreateAccountParameters) -> Result<PdsSe
 
     let did = did
         .parse()
-        .map_err(|error| MigrationError::Validation {
+        .map_err(|_error| MigrationError::Validation {
             field: "did".to_string(),
         })
         .unwrap();
@@ -749,12 +743,17 @@ pub async fn create_account(parameters: CreateAccountParameters) -> Result<PdsSe
                     let access_token = res.access_jwt.clone();
                     let refresh_token = res.refresh_jwt.clone();
                     let did = res.did.as_str().to_string();
-                    pds_session.create_new_session(
-                        did.as_str(),
-                        access_token.as_str(),
-                        refresh_token.as_str(),
-                        new_pds_host.as_str(),
-                    );
+                    if pds_session
+                        .create_new_session(
+                            did.as_str(),
+                            access_token.as_str(),
+                            refresh_token.as_str(),
+                            new_pds_host.as_str(),
+                        )
+                        .is_err()
+                    {
+                        return Err(GuiError::Runtime);
+                    }
                     Ok(pds_session)
                 }
                 Err(e) => {

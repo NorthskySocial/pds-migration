@@ -7,7 +7,7 @@ use pdsmigration_common::ExportBlobsRequest;
 #[tracing::instrument(skip(req))]
 #[post("/export-blobs")]
 pub async fn export_blobs_api(req: Json<ExportBlobsRequest>) -> Result<HttpResponse, ApiError> {
-    tracing::info!("Exporting blobs");
+    tracing::info!("Export blobs request received");
     let result = pdsmigration_common::export_blobs_api(req.into_inner())
         .await
         .map_err(|error| ApiError::Runtime {

@@ -8,6 +8,7 @@ use std::env;
 #[tracing::instrument(skip(req))]
 #[post("/export-repo")]
 pub async fn export_pds_api(req: Json<ExportPDSRequest>) -> Result<HttpResponse, ApiError> {
+    tracing::info!("Export repository request received");
     // Download the repository file locally
     let req_inner = req.into_inner();
     let did = req_inner.did.clone();

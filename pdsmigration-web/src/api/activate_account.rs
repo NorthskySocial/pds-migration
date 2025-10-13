@@ -16,6 +16,7 @@ pub struct ActivateAccountRequest {
 pub async fn activate_account_api(
     req: Json<ActivateAccountRequest>,
 ) -> Result<HttpResponse, ApiError> {
+    tracing::info!("Activate account request received");
     let req = req.into_inner();
     let did = req.did.clone();
     let token = req.token.clone();

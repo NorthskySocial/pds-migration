@@ -23,6 +23,7 @@ pub struct CreateAccountApiRequest {
 pub async fn create_account_api(
     req: Json<CreateAccountApiRequest>,
 ) -> Result<HttpResponse, ApiError> {
+    tracing::info!("Create account request received");
     let req = req.into_inner();
 
     let did = req.did.parse().map_err(|_error| ApiError::Validation {
