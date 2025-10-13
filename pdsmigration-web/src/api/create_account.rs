@@ -9,12 +9,19 @@ use serde::{Deserialize, Serialize};
 pub struct CreateAccountApiRequest {
     pub email: String,
     pub handle: String,
+    #[serde(
+        skip_serializing_if = "core::option::Option::is_none",
+        skip_deserializing_if = "Option::is_none"
+    )]
     pub invite_code: String,
     pub password: String,
     pub token: String,
     pub pds_host: String,
     pub did: String,
-    #[serde(skip_serializing_if = "core::option::Option::is_none")]
+    #[serde(
+        skip_serializing_if = "core::option::Option::is_none",
+        skip_deserializing_if = "Option::is_none"
+    )]
     pub recovery_key: Option<String>,
 }
 
