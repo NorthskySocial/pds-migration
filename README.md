@@ -18,7 +18,7 @@ network. It consists of three main packages:
 
 ## Technology Stack
 
-- **Language**: Rust (nightly toolchain required)
+- **Language**: Rust (1.91.0-beta toolchain required)
 - **GUI Framework**: egui/eframe with both glow and wgpu rendering backends
 - **Web Framework**: Actix-Web
 - **Cloud Storage**: AWS S3 SDK
@@ -31,16 +31,16 @@ network. It consists of three main packages:
 
 ### System Requirements
 
-- **Rust Toolchain**: Nightly channel with `rustfmt` and `clippy` components
+- **Rust Toolchain**: 1.91.0-beta channel with `rustfmt` and `clippy` components
 - **Platform Support**:
     - Native: Windows, macOS, Linux
 
 ### Installation
 
 ```bash
-# Install Rust nightly (if not already installed)
+# Install Rust 1.91.0-beta (if not already installed)
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-rustup toolchain install nightly
+rustup toolchain install 1.91.0-beta
 rustup component add rustfmt clippy
 ```
 
@@ -193,7 +193,7 @@ GitHub Actions automatically:
 
 ## Contributing
 
-1. Ensure you have Rust nightly installed
+1. Ensure you have Rust 1.91.0-beta installed
 2. Format code: `cargo fmt`
 3. Run tests: `cargo test --workspace`
 4. Check linting: `cargo clippy`
