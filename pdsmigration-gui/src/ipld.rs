@@ -15,6 +15,7 @@ pub fn cid_for_cbor<T: Serialize>(data: &T) -> Cid {
     let hash = sha.finalize();
     let cid = Cid::new_v1(
         DAGCBORCODEC,
+        #[allow(deprecated)]
         Multihash::<64>::wrap(SHA2_256, hash.as_slice()).unwrap(),
     );
     cid
@@ -23,6 +24,7 @@ pub fn cid_for_cbor<T: Serialize>(data: &T) -> Cid {
 pub fn sha256_to_cid(hash: Vec<u8>) -> Cid {
     let cid = Cid::new_v1(
         RAWCODEC,
+        #[allow(deprecated)]
         Multihash::<64>::wrap(SHA2_256, hash.as_slice()).unwrap(),
     );
     cid
