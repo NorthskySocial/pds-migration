@@ -1,3 +1,19 @@
+use derive_more::Display;
+
+#[derive(Debug, Clone, Display)]
+pub enum SessionError {
+    #[display("DID mismatch: expected '{expected}', but got '{provided}'")]
+    DidMismatch { expected: String, provided: String },
+    #[display("Session already exists for DID: {did}")]
+    SessionAlreadyExists { did: String },
+    #[display("No DID found in session")]
+    MissingDid,
+    #[display("Old session configuration not found")]
+    MissingOldSession,
+    #[display("New session configuration not found")]
+    MissingNewSession,
+}
+
 #[derive(Default, Clone)]
 pub struct PdsSession {
     did: Option<String>,
@@ -51,7 +67,7 @@ impl PdsSession {
         access_token: &str,
         refresh_token: &str,
         host: &str,
-    ) {
+    ) -> Result<(), SessionError> {
         match self.did.clone() {
             None => {
                 self.did = Some(did.to_string());
@@ -61,12 +77,13 @@ impl PdsSession {
                     host: host.to_string(),
                     did: did.to_string(),
                 });
+                Ok(())
             }
-            Some(_) => {
+            Some(existing_did) => {
                 tracing::error!("Session already exists for another DID");
-                panic!("Session already exists for another DID");
+                Err(SessionError::SessionAlreadyExists { did: existing_did })
             }
-        };
+        }
     }
 
     pub fn create_new_session(
@@ -75,7 +92,7 @@ impl PdsSession {
         access_token: &str,
         refresh_token: &str,
         host: &str,
-    ) {
+    ) -> Result<(), SessionError> {
         match self.did.clone() {
             None => {
                 self.did = Some(_did.to_string());
@@ -85,11 +102,15 @@ impl PdsSession {
                     host: host.to_string(),
                     did: _did.to_string(),
                 });
+                Ok(())
             }
             Some(did) => {
                 if did != _did {
-                    tracing::error!("Session already exists for another DID");
-                    panic!("Session already exists for another DID");
+                    tracing::error!("DID mismatch: expected '{}', got '{}'", did, _did);
+                    Err(SessionError::DidMismatch {
+                        expected: did,
+                        provided: _did.to_string(),
+                    })
                 } else {
                     self.new_session_config = Some(SessionConfig {
                         access_token: access_token.to_string(),
@@ -97,9 +118,10 @@ impl PdsSession {
                         host: host.to_string(),
                         did,
                     });
+                    Ok(())
                 }
             }
-        };
+        }
     }
 
     pub fn did(&self) -> &Option<String> {
@@ -112,5 +134,21 @@ impl PdsSession {
 
     pub fn new_session_config(&self) -> &Option<SessionConfig> {
         &self.new_session_config
+    }
+
+    pub fn get_did(&self) -> Result<&str, SessionError> {
+        self.did.as_deref().ok_or(SessionError::MissingDid)
+    }
+
+    pub fn get_old_session_config(&self) -> Result<&SessionConfig, SessionError> {
+        self.old_session_config
+            .as_ref()
+            .ok_or(SessionError::MissingOldSession)
+    }
+
+    pub fn get_new_session_config(&self) -> Result<&SessionConfig, SessionError> {
+        self.new_session_config
+            .as_ref()
+            .ok_or(SessionError::MissingNewSession)
     }
 }
