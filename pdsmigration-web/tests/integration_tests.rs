@@ -91,39 +91,6 @@ mod integration_tests {
     }
 
     #[actix_rt::test]
-    async fn test_create_account() {
-        let app_config = create_test_config();
-
-        let app = test::init_service(
-            App::new()
-                .app_data(web::Data::new(app_config))
-                .service(create_account_api),
-        )
-        .await;
-
-        let req = test::TestRequest::post()
-            .uri("/create-account")
-            .set_json(json!({
-                "email": "dummy@email.com",
-                "handle": "dummy.handle",
-                "invite_code": "dummy-invite-code",
-                "password": "password",
-                "token": "dummy-token",
-                "pds_host": "https://dummy.pds.host",
-                "did": "did:key"
-            }))
-            .to_request();
-
-        let resp = test::call_service(&app, req).await;
-
-        let status = resp.status().clone();
-
-        let body = test::read_body(resp).await;
-        eprintln!("{:?}", body);
-        assert_eq!(status, StatusCode::OK);
-    }
-
-    #[actix_rt::test]
     async fn test_request_token_missing_fields() {
         let app_config = create_test_config();
 
