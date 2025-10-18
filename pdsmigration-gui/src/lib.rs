@@ -716,7 +716,7 @@ pub async fn create_account(parameters: CreateAccountParameters) -> Result<PdsSe
     let create_account_request = CreateAccountRequest {
         did,
         email: Some(email.clone()),
-        handle: handle.clone(),
+        handle: handle.clone().parse().unwrap(),
         invite_code: Some(invite_code.trim().to_string()),
         password: Some(password.clone()),
         recovery_key: None,
