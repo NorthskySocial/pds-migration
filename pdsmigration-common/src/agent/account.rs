@@ -16,7 +16,7 @@ pub async fn create_account(
         data: CreateAccountInputData {
             did: Some(account_request.did.clone()),
             email: account_request.email.clone(),
-            handle: account_request.handle.parse().unwrap(),
+            handle: account_request.handle.clone(),
             invite_code: account_request.invite_code.clone(),
             password: account_request.password.clone(),
             plc_op: None,
