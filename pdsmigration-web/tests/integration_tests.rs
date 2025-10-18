@@ -12,7 +12,6 @@ use serde_json::json;
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use serde::{Deserialize, Serialize};
 
     fn create_test_config() -> AppConfig {
         AppConfig {
