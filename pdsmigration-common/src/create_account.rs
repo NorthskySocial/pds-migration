@@ -1,11 +1,11 @@
-use bsky_sdk::api::types::string::Did;
+use bsky_sdk::api::types::string::{Did, Handle};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CreateAccountRequest {
     pub did: Did,
     pub email: Option<String>,
-    pub handle: String,
+    pub handle: Handle,
     pub invite_code: Option<String>,
     pub password: Option<String>,
     pub recovery_key: Option<String>,
