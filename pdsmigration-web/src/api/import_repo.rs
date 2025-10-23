@@ -28,6 +28,7 @@ pub async fn import_pds_api(
     let key = "migration/".to_string() + &did.replace(":", "-") + ".car";
 
     // Download the file from S3
+        tracing::info!("Started download from S3 for import");
     let s3_response = client
         .get_object()
         .bucket(&bucket_name)
@@ -37,6 +38,7 @@ pub async fn import_pds_api(
         .map_err(|error| ApiError::Runtime {
             message: error.to_string(),
         })?;
+            tracing::info!("Finished download from S3. Starting local save");
 
     // Save the file locally using AWS SDK's built-in method
     let body_bytes = s3_response
@@ -46,6 +48,8 @@ pub async fn import_pds_api(
         .map_err(|error| ApiError::Runtime {
             message: error.to_string(),
         })?;
+
+            tracing::info!("Started upload of files");
 
     std::fs::write(&file_name, body_bytes.into_bytes()).map_err(|error| ApiError::Runtime {
         message: error.to_string(),
