@@ -1,14 +1,43 @@
 use crate::config::AppConfig;
-use crate::errors::ApiError;
+use crate::errors::{ApiError, ApiErrorBody};
 use crate::post;
 use actix_web::web::{Data, Json};
 use actix_web::HttpResponse;
 use pdsmigration_common::ImportPDSRequest;
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+pub struct ImportPDSApiRequest {
+    pub pds_host: String,
+    pub did: String,
+    pub token: String,
+}
+
+impl From<ImportPDSApiRequest> for ImportPDSRequest {
+    fn from(req: ImportPDSApiRequest) -> Self {
+        Self {
+            pds_host: req.pds_host,
+            did: req.did,
+            token: req.token,
+        }
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/import-repo",
+    request_body = ImportPDSApiRequest,
+    responses(
+        (status = 200, description = "Repo imported successfully"),
+        (status = 400, description = "Invalid request", body = ApiErrorBody, content_type = "application/json")
+    ),
+    tag = "pdsmigration-web"
+)]
 #[tracing::instrument(skip(req))]
 #[post("/import-repo")]
 pub async fn import_pds_api(
-    req: Json<ImportPDSRequest>,
+    req: Json<ImportPDSApiRequest>,
     config: Data<AppConfig>,
 ) -> Result<HttpResponse, ApiError> {
     tracing::info!("Import repository request received");
@@ -50,7 +79,7 @@ pub async fn import_pds_api(
     std::fs::write(&file_name, body_bytes.into_bytes()).map_err(|error| ApiError::Runtime {
         message: error.to_string(),
     })?;
-    pdsmigration_common::import_pds_api(req_inner).await?;
+    pdsmigration_common::import_pds_api(req_inner.into()).await?;
     tracing::info!("Repository imported successfully");
 
     Ok(HttpResponse::Ok().finish())

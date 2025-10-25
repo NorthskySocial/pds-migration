@@ -1,14 +1,44 @@
-use crate::errors::ApiError;
+use crate::errors::{ApiError, ApiErrorBody};
 use crate::post;
 use actix_web::web::Json;
 use actix_web::HttpResponse;
 use pdsmigration_common::{MigrationError, UploadBlobsRequest};
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+pub struct UploadBlobsApiRequest {
+    pub pds_host: String,
+    pub did: String,
+    pub token: String,
+}
+
+impl From<UploadBlobsApiRequest> for UploadBlobsRequest {
+    fn from(req: UploadBlobsApiRequest) -> Self {
+        Self {
+            pds_host: req.pds_host,
+            did: req.did,
+            token: req.token,
+        }
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/upload-blobs",
+    request_body = UploadBlobsApiRequest,
+    responses(
+        (status = 200, description = "Upload exported blobs successful"),
+        (status = 400, description = "Invalid request", body = ApiErrorBody, content_type = "application/json")
+    ),
+    tag = "pdsmigration-web"
+)]
 #[tracing::instrument(skip(req))]
 #[post("/upload-blobs")]
-pub async fn upload_blobs_api(req: Json<UploadBlobsRequest>) -> Result<HttpResponse, ApiError> {
+pub async fn upload_blobs_api(req: Json<UploadBlobsApiRequest>) -> Result<HttpResponse, ApiError> {
     tracing::info!("Upload blobs request received");
-    pdsmigration_common::upload_blobs_api(req.into_inner())
+    let req = req.into_inner();
+    pdsmigration_common::upload_blobs_api(req.into())
         .await
         .map_err(|e| {
             tracing::error!("Failed to upload blobs: {}", e);

@@ -1,6 +1,7 @@
 mod api;
 mod config;
 mod errors;
+mod openapi;
 
 use crate::api::{
     activate_account_api, create_account_api, deactivate_account_api, export_blobs_api,
@@ -8,6 +9,7 @@ use crate::api::{
     migrate_preferences_api, missing_blobs_api, request_token_api, upload_blobs_api,
 };
 use crate::config::AppConfig;
+use crate::openapi::ApiDoc;
 use actix_web::dev::Server;
 use actix_web::web::Json;
 use actix_web::{post, web, App, HttpResponse, HttpServer};
@@ -15,6 +17,8 @@ use actix_web_prom::PrometheusMetricsBuilder;
 use dotenvy::dotenv;
 use std::io;
 use tracing_actix_web::TracingLogger;
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 pub const APPLICATION_JSON: &str = "application/json";
 
@@ -30,6 +34,7 @@ fn init_http_server(app_config: AppConfig) -> io::Result<Server> {
             .wrap(prometheus.clone())
             .wrap(TracingLogger::default())
             .app_data(web::Data::new(app_config.clone()))
+            // API routes
             .service(request_token_api)
             .service(create_account_api)
             .service(export_pds_api)
@@ -43,6 +48,10 @@ fn init_http_server(app_config: AppConfig) -> io::Result<Server> {
             .service(migrate_plc_api)
             .service(get_service_auth_api)
             .service(health_check)
+            .service(
+                SwaggerUi::new("/swagger-ui/{_:.*}")
+                    .url("/api-docs/openapi.json", ApiDoc::openapi()),
+            )
     })
     .bind(format!("0.0.0.0:{server_port}"))?
     .workers(worker_count)

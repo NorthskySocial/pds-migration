@@ -1,12 +1,13 @@
-use crate::errors::ApiError;
+use crate::errors::{ApiError, ApiErrorBody};
 use crate::post;
 use actix_web::web::Json;
 use actix_web::HttpResponse;
 use pdsmigration_common::{create_account, CreateAccountRequest};
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use utoipa::ToSchema;
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, ToSchema)]
 pub struct CreateAccountApiRequest {
     pub email: String,
     pub handle: String,
@@ -37,6 +38,16 @@ impl fmt::Debug for CreateAccountApiRequest {
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/create-account",
+    request_body = CreateAccountApiRequest,
+    responses(
+        (status = 200, description = "Account created successfully"),
+        (status = 400, description = "Invalid request", body = ApiErrorBody, content_type = "application/json")
+    ),
+    tag = "pdsmigration-web"
+)]
 #[tracing::instrument(skip(req), fields(
     email = %req.email,
     handle = %req.handle,

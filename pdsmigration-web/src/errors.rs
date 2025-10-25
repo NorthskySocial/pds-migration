@@ -4,14 +4,15 @@ use actix_web::{HttpResponse, ResponseError};
 use derive_more::{Display, Error};
 use pdsmigration_common::MigrationError;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct ApiErrorBody {
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ApiErrorBody {
     code: String,
     message: String,
 }
 
-#[derive(Debug, Display, Error)]
+#[derive(Debug, Display, Error, ToSchema)]
 pub enum ApiError {
     #[display("Validation error on field: {field}")]
     Validation { field: String },

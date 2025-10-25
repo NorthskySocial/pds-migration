@@ -1,18 +1,47 @@
-use crate::errors::ApiError;
+use crate::errors::{ApiError, ApiErrorBody};
 use crate::post;
 use actix_web::web::Json;
 use actix_web::HttpResponse;
 use pdsmigration_common::ExportPDSRequest;
+use serde::{Deserialize, Serialize};
 use std::env;
+use utoipa::ToSchema;
 
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+pub struct ExportPDSApiRequest {
+    pub pds_host: String,
+    pub did: String,
+    pub token: String,
+}
+
+impl From<ExportPDSApiRequest> for ExportPDSRequest {
+    fn from(req: ExportPDSApiRequest) -> Self {
+        Self {
+            pds_host: req.pds_host,
+            did: req.did,
+            token: req.token,
+        }
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/export-repo",
+    request_body = ExportPDSApiRequest,
+    responses(
+        (status = 200, description = "Export Repo completed successfully"),
+        (status = 400, description = "Invalid request", body = ApiErrorBody, content_type = "application/json")
+    ),
+    tag = "pdsmigration-web"
+)]
 #[tracing::instrument(skip(req))]
 #[post("/export-repo")]
-pub async fn export_pds_api(req: Json<ExportPDSRequest>) -> Result<HttpResponse, ApiError> {
+pub async fn export_pds_api(req: Json<ExportPDSApiRequest>) -> Result<HttpResponse, ApiError> {
     tracing::info!("Export repository request received");
     // Download the repository file locally
     let req_inner = req.into_inner();
     let did = req_inner.did.clone();
-    pdsmigration_common::export_pds_api(req_inner)
+    pdsmigration_common::export_pds_api(req_inner.into())
         .await
         .map_err(|e| {
             tracing::error!("Failed to export repository: {}", e);
