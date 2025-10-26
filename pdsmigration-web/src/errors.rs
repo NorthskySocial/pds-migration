@@ -8,7 +8,9 @@ use utoipa::ToSchema;
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ApiErrorBody {
+    #[schema(example = "VALIDATION_ERROR")]
     code: String,
+    #[schema(example = "Field 'did' is invalid")]
     message: String,
 }
 
@@ -22,6 +24,8 @@ pub enum ApiError {
     Runtime { message: String },
     #[display("Authentication error: {message}")]
     Authentication { message: String },
+    #[display("Too many requests: {message}")]
+    RateLimit { message: String },
 }
 
 impl ResponseError for ApiError {
@@ -31,6 +35,7 @@ impl ResponseError for ApiError {
             ApiError::Upstream { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             ApiError::Runtime { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             ApiError::Authentication { .. } => StatusCode::UNAUTHORIZED,
+            ApiError::RateLimit { .. } => StatusCode::TOO_MANY_REQUESTS,
         }
     }
 
@@ -40,6 +45,7 @@ impl ResponseError for ApiError {
             ApiError::Upstream { message } => ("UPSTREAM_ERROR", message.to_string()),
             ApiError::Runtime { message } => ("RUNTIME_ERROR", message.to_string()),
             ApiError::Authentication { message } => ("AUTHENTICATION_ERROR", message.to_string()),
+            ApiError::RateLimit { message } => ("RATE_LIMIT", message.to_string()),
         };
 
         HttpResponse::build(self.status_code())
@@ -57,7 +63,7 @@ impl From<MigrationError> for ApiError {
             MigrationError::Validation { field } => ApiError::Validation { field },
             MigrationError::Upstream { message } => ApiError::Upstream { message },
             MigrationError::Runtime { message } => ApiError::Runtime { message },
-            MigrationError::RateLimitReached => ApiError::Runtime {
+            MigrationError::RateLimitReached => ApiError::RateLimit {
                 message: "Rate limit reached. Please try again later.".to_string(),
             },
             MigrationError::Authentication { .. } => ApiError::Authentication {

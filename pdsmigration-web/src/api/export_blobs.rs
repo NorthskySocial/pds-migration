@@ -8,10 +8,15 @@ use utoipa::ToSchema;
 
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct ExportBlobsApiRequest {
+    #[schema(example = "https://destinationPDS.example.com")]
     pub destination: String,
+    #[schema(example = "https://sourcePDS.example.com")]
     pub origin: String,
+    #[schema(example = "did:plc:abcd1234efgh5678ijkl")]
     pub did: String,
+    #[schema(example = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example.signature")]
     pub origin_token: String,
+    #[schema(example = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example.signature")]
     pub destination_token: String,
 }
 

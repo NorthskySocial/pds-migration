@@ -18,6 +18,9 @@ mod integration_tests {
             server: ServerConfig {
                 port: 8080,
                 workers: 1,
+                rate_limit_window_secs: 60,
+                rate_limit_max_requests: 60,
+                auth_token: None,
             },
             external_services: ExternalServices {
                 s3_endpoint: "http://test-s3.example.com".to_string(),

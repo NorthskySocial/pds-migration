@@ -1,6 +1,7 @@
 mod api;
 mod config;
 mod errors;
+mod middleware;
 mod openapi;
 
 use crate::api::{
@@ -9,19 +10,29 @@ use crate::api::{
     migrate_preferences_api, missing_blobs_api, request_token_api, upload_blobs_api,
 };
 use crate::config::AppConfig;
+use crate::middleware::rate_limit::RateLimiter;
 use crate::openapi::ApiDoc;
 use actix_web::dev::Server;
 use actix_web::web::Json;
+use actix_web::ResponseError;
 use actix_web::{post, web, App, HttpResponse, HttpServer};
 use actix_web_prom::PrometheusMetricsBuilder;
 use dotenvy::dotenv;
 use std::io;
+use std::time::Duration;
 use tracing_actix_web::TracingLogger;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 pub const APPLICATION_JSON: &str = "application/json";
 
+/*
+ * Initialize the HTTP server
+ *
+ * @param app_config: The application configuration
+ * @return: The initialized HTTP server
+ * @throws: io::Error if the server fails to start
+ */
 fn init_http_server(app_config: AppConfig) -> io::Result<Server> {
     let server_port = app_config.server.port;
     let worker_count = app_config.server.workers;
@@ -33,8 +44,19 @@ fn init_http_server(app_config: AppConfig) -> io::Result<Server> {
         App::new()
             .wrap(prometheus.clone())
             .wrap(TracingLogger::default())
+            .wrap(RateLimiter::new(
+                app_config.server.rate_limit_max_requests,
+                Duration::from_secs(app_config.server.rate_limit_window_secs),
+            ))
+            .wrap(crate::middleware::auth_token::AuthToken::new())
             .app_data(web::Data::new(app_config.clone()))
-            // API routes
+            .app_data(web::JsonConfig::default().error_handler(|err, _req| {
+                let api_err = crate::errors::ApiError::Validation {
+                    field: "body".to_string(),
+                };
+                let resp = api_err.error_response();
+                actix_web::error::InternalError::from_response(err, resp).into()
+            }))
             .service(request_token_api)
             .service(create_account_api)
             .service(export_pds_api)
@@ -103,6 +125,9 @@ mod tests {
             server: ServerConfig {
                 port: 8080,
                 workers: 2,
+                rate_limit_window_secs: 60,
+                rate_limit_max_requests: 60,
+                auth_token: None,
             },
             external_services: ExternalServices {
                 s3_endpoint: "http://test-s3.example.com".to_string(),
@@ -120,6 +145,9 @@ mod tests {
             server: ServerConfig {
                 port: 8080,
                 workers: 1,
+                rate_limit_window_secs: 60,
+                rate_limit_max_requests: 60,
+                auth_token: None,
             },
             external_services: ExternalServices {
                 s3_endpoint: "http://test-s3.example.com".to_string(),

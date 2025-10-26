@@ -8,8 +8,11 @@ use utoipa::ToSchema;
 
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct UploadBlobsApiRequest {
+    #[schema(example = "https://pds.example.com")]
     pub pds_host: String,
+    #[schema(example = "did:plc:abcd1234efgh5678ijkl")]
     pub did: String,
+    #[schema(example = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example.signature")]
     pub token: String,
 }
 

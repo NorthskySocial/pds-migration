@@ -8,11 +8,17 @@ use utoipa::ToSchema;
 
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct MigratePlcApiRequest {
+    #[schema(example = "https://destinationPDS.example.com")]
     pub destination: String,
+    #[schema(example = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example.signature")]
     pub destination_token: String,
+    #[schema(example = "https://sourcePDS.example.com")]
     pub origin: String,
+    #[schema(example = "did:plc:abcd1234efgh5678ijkl")]
     pub did: String,
+    #[schema(example = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example.signature")]
     pub origin_token: String,
+    #[schema(example = "7G54NB")]
     pub plc_signing_token: String,
     #[serde(skip_serializing_if = "core::option::Option::is_none")]
     pub user_recovery_key: Option<String>,

@@ -21,10 +21,10 @@ dotenvy = "0.15.7"
 actix-rt = "2.10.0"
 actix-web = "4.8.0"
 tracing-actix-web = "0.7.19"
-pdsmigration-common = {workspace = true}
+pdsmigration-common = { workspace = true }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-aws-config = { version = "1.5.14", features = ["behavior-version-latest"]}
+aws-config = { version = "1.5.14", features = ["behavior-version-latest"] }
 aws-sdk-s3 = "1.70.0"
 serde = { version = "1.0.218", features = ["derive"] }
 prometheus = "0.14.0"
@@ -32,6 +32,9 @@ actix-web-prom = "0.10.0"
 derive_more = { version = "2.0.1" }
 utoipa = { version = "5.4.0", features = ["actix_extras"] }
 utoipa-swagger-ui = { version = "9.0.2", features = ["actix-web", "debug-embed"] }
+futures-util = { version = "0.3.31" }
+futures = { version = "0.3.31" }
+actix-ws = "0.3.0"
 
 [dev-dependencies]
 actix-web = { version = "4.8.0", features = ["macros"] }

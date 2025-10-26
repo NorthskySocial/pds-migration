@@ -9,14 +9,22 @@ use utoipa::ToSchema;
 
 #[derive(Deserialize, Serialize, ToSchema)]
 pub struct CreateAccountApiRequest {
+    #[schema(example = "user@example.com")]
     pub email: String,
+    #[schema(example = "alice.test")]
     pub handle: String,
+    #[schema(example = "bsky-invite-abc123-xyz789")]
     pub invite_code: String,
+    #[schema(example = "StrongP@ssw0rd!")]
     pub password: String,
+    #[schema(example = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example.signature")]
     pub token: String,
+    #[schema(example = "https://pds.example.com")]
     pub pds_host: String,
+    #[schema(example = "did:plc:abcd1234efgh5678ijkl")]
     pub did: String,
     #[serde(skip_serializing_if = "core::option::Option::is_none")]
+    #[schema(example = "did:key:zQ3shokFTS3brHcDQrn82RUDfCZESWL1ZdCEJwekUDPQiYBme")]
     pub recovery_key: Option<String>,
 }
 
@@ -44,7 +52,10 @@ impl fmt::Debug for CreateAccountApiRequest {
     request_body = CreateAccountApiRequest,
     responses(
         (status = 200, description = "Account created successfully"),
-        (status = 400, description = "Invalid request", body = ApiErrorBody, content_type = "application/json")
+        (status = 400, description = "Invalid request", body = ApiErrorBody, content_type = "application/json"),
+        (status = 401, description = "Authentication error", body = ApiErrorBody, content_type = "application/json"),
+        (status = 429, description = "Rate limit exceeded", body = ApiErrorBody, content_type = "application/json"),
+        (status = 500, description = "Internal server error", body = ApiErrorBody, content_type = "application/json")
     ),
     tag = "pdsmigration-web"
 )]
@@ -85,9 +96,7 @@ pub async fn create_account_api(
         },
     )
     .await
-    .map_err(|e| ApiError::Upstream {
-        message: e.to_string(),
-    })?;
+    .map_err(ApiError::from)?;
     tracing::info!("Account created successfully");
     Ok(HttpResponse::Ok().finish())
 }

@@ -7,8 +7,11 @@ use utoipa::ToSchema;
 
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct ActivateAccountApiRequest {
+    #[schema(example = "https://pds.example.com")]
     pub pds_host: String,
+    #[schema(example = "did:plc:abcd1234efgh5678ijkl")]
     pub did: String,
+    #[schema(example = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example.signature")]
     pub token: String,
 }
 
@@ -19,7 +22,10 @@ pub struct ActivateAccountApiRequest {
     request_body = ActivateAccountApiRequest,
     responses(
         (status = 200, description = "Account activated successfully"),
-        (status = 400, description = "Invalid request", body = ApiErrorBody, content_type = "application/json")
+        (status = 400, description = "Invalid request", body = ApiErrorBody, content_type = "application/json"),
+        (status = 401, description = "Authentication error", body = ApiErrorBody, content_type = "application/json"),
+        (status = 429, description = "Rate limit exceeded", body = ApiErrorBody, content_type = "application/json"),
+        (status = 500, description = "Internal server error", body = ApiErrorBody, content_type = "application/json")
     ),
     tag = "pdsmigration-web"
 )]
