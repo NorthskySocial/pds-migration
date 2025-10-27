@@ -32,7 +32,9 @@ impl From<UploadBlobsApiRequest> for UploadBlobsRequest {
     request_body = UploadBlobsApiRequest,
     responses(
         (status = 200, description = "Upload exported blobs successful"),
-        (status = 400, description = "Invalid request", body = ApiErrorBody, content_type = "application/json")
+        (status = 400, description = "Invalid request", body = ApiErrorBody, content_type = "application/json"),
+        (status = 401, description = "Authentication error", body = ApiErrorBody, content_type = "application/json"),
+        (status = 429, description = "Rate limit exceeded", body = ApiErrorBody, content_type = "application/json")
     ),
     tag = "pdsmigration-web"
 )]

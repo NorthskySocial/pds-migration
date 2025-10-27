@@ -6,25 +6,44 @@ use pdsmigration_common::MigrationError;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+#[derive(Debug, Display, Clone, Serialize, Deserialize, ToSchema)]
+pub enum ApiErrorCode {
+    #[display("VALIDATION_ERROR")]
+    Validation,
+    #[display("UPSTREAM_ERROR")]
+    Upstream,
+    #[display("RUNTIME_ERROR")]
+    Runtime,
+    #[display("AUTHENTICATION_ERROR")]
+    Authentication,
+    #[display("RATE_LIMIT")]
+    RateLimit,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ApiErrorBody {
-    #[schema(example = "VALIDATION_ERROR")]
-    code: String,
-    #[schema(example = "Field 'did' is invalid")]
+    #[schema(example = ApiErrorCode::Validation)]
+    code: ApiErrorCode,
+    #[schema(example = "did")]
     message: String,
 }
 
 #[derive(Debug, Display, Error, ToSchema)]
 pub enum ApiError {
     #[display("Validation error on field: {field}")]
+    #[schema(title = "Validation")]
     Validation { field: String },
     #[display("Upstream error: {message}")]
+    #[schema(title = "Upstream")]
     Upstream { message: String },
     #[display("Unexpected error occurred: {message}")]
+    #[schema(title = "Runtime")]
     Runtime { message: String },
     #[display("Authentication error: {message}")]
+    #[schema(title = "Authentication")]
     Authentication { message: String },
     #[display("Too many requests: {message}")]
+    #[schema(title = "Rate limit")]
     RateLimit { message: String },
 }
 
@@ -41,19 +60,18 @@ impl ResponseError for ApiError {
 
     fn error_response(&self) -> HttpResponse {
         let (code, message) = match self {
-            ApiError::Validation { field } => ("VALIDATION_ERROR", field.to_string()),
-            ApiError::Upstream { message } => ("UPSTREAM_ERROR", message.to_string()),
-            ApiError::Runtime { message } => ("RUNTIME_ERROR", message.to_string()),
-            ApiError::Authentication { message } => ("AUTHENTICATION_ERROR", message.to_string()),
-            ApiError::RateLimit { message } => ("RATE_LIMIT", message.to_string()),
+            ApiError::Validation { field } => (ApiErrorCode::Validation, field.to_string()),
+            ApiError::Upstream { message } => (ApiErrorCode::Upstream, message.to_string()),
+            ApiError::Runtime { message } => (ApiErrorCode::Runtime, message.to_string()),
+            ApiError::Authentication { message } => {
+                (ApiErrorCode::Authentication, message.to_string())
+            }
+            ApiError::RateLimit { message } => (ApiErrorCode::RateLimit, message.to_string()),
         };
 
         HttpResponse::build(self.status_code())
             .insert_header(ContentType::json())
-            .json(ApiErrorBody {
-                code: code.to_string(),
-                message,
-            })
+            .json(ApiErrorBody { code, message })
     }
 }
 

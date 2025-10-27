@@ -44,7 +44,9 @@ impl From<MigratePlcApiRequest> for MigratePlcRequest {
     request_body = MigratePlcApiRequest,
     responses(
         (status = 200, description = "PLC migrated successfully"),
-        (status = 400, description = "Invalid request", body = ApiErrorBody, content_type = "application/json")
+        (status = 400, description = "Invalid request", body = ApiErrorBody, content_type = "application/json"),
+        (status = 401, description = "Authentication error", body = ApiErrorBody, content_type = "application/json"),
+        (status = 429, description = "Rate limit exceeded", body = ApiErrorBody, content_type = "application/json"),
     ),
     tag = "pdsmigration-web"
 )]
