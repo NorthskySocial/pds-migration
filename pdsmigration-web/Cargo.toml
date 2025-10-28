@@ -36,6 +36,7 @@ utoipa-swagger-ui = { version = "9.0.2", features = ["actix-web", "debug-embed"]
 futures-util = { version = "0.3.31" }
 futures = { version = "0.3.31" }
 actix-ws = "0.3.0"
+tokio = "1.48.0"
 
 [dev-dependencies]
 actix-web = { version = "4.8.0", features = ["macros"] }

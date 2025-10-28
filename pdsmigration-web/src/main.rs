@@ -6,8 +6,9 @@ mod openapi;
 
 use crate::api::{
     activate_account_api, create_account_api, deactivate_account_api, export_blobs_api,
-    export_pds_api, get_service_auth_api, health_check, import_pds_api, migrate_plc_api,
-    migrate_preferences_api, missing_blobs_api, request_token_api, upload_blobs_api,
+    export_pds_api, get_service_auth_api, health_check, import_pds_api, long_health_check,
+    migrate_plc_api, migrate_preferences_api, missing_blobs_api, request_token_api,
+    upload_blobs_api,
 };
 use crate::config::AppConfig;
 use crate::middleware::rate_limit::RateLimiter;
@@ -70,6 +71,7 @@ fn init_http_server(app_config: AppConfig) -> io::Result<Server> {
             .service(migrate_plc_api)
             .service(get_service_auth_api)
             .service(health_check)
+            .service(long_health_check)
             .service(
                 SwaggerUi::new("/swagger-ui/{_:.*}")
                     .url("/api-docs/openapi.json", ApiDoc::openapi()),
