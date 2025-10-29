@@ -20,6 +20,7 @@ use crate::api::*;
         migrate_preferences_api,
         migrate_plc_api,
         get_service_auth_api,
+        export_blobs_ws_api, 
     ),
     components(
         schemas(
