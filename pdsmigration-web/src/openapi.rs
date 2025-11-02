@@ -20,7 +20,10 @@ use crate::api::*;
         migrate_preferences_api,
         migrate_plc_api,
         get_service_auth_api,
-        export_blobs_ws_api, 
+        enqueue_export_blobs_job_api,
+        list_jobs_api,
+        get_job_api,
+        cancel_job_api,
     ),
     components(
         schemas(
@@ -35,6 +38,13 @@ use crate::api::*;
             MigratePreferencesApiRequest,
             MigratePlcApiRequest,
             ServiceAuthApiRequest,
+            // Jobs
+            crate::background_jobs::JobKind,
+            crate::background_jobs::JobStatus,
+            crate::background_jobs::JobProgress,
+            crate::background_jobs::JobRecord,
+            crate::api::EnqueueJobResponse,
+            crate::api::CancelJobResponse,
             ApiError,
             ApiErrorBody
         ),

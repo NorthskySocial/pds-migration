@@ -1,15 +1,18 @@
 mod api;
+mod background_jobs;
 mod config;
 mod errors;
 mod middleware;
 mod openapi;
 
 use crate::api::{
-    activate_account_api, create_account_api, deactivate_account_api, export_blobs_api,
-    export_blobs_ws_api, export_pds_api, get_service_auth_api, health_check, import_pds_api,
-    long_health_check, migrate_plc_api, migrate_preferences_api, missing_blobs_api,
-    request_token_api, upload_blobs_api,
+    activate_account_api, cancel_job_api, create_account_api, deactivate_account_api,
+    enqueue_export_blobs_job_api, export_blobs_api, export_pds_api, get_job_api,
+    get_service_auth_api, health_check, import_pds_api, list_jobs_api, long_health_check,
+    migrate_plc_api, migrate_preferences_api, missing_blobs_api, request_token_api,
+    upload_blobs_api,
 };
+use crate::background_jobs::JobManager;
 use crate::config::AppConfig;
 use crate::middleware::rate_limit::RateLimiter;
 use crate::openapi::ApiDoc;
@@ -51,6 +54,7 @@ fn init_http_server(app_config: AppConfig) -> io::Result<Server> {
             ))
             .wrap(middleware::auth_token::AuthToken::new())
             .app_data(web::Data::new(app_config.clone()))
+            .app_data(web::Data::new(JobManager::new()))
             .app_data(web::JsonConfig::default().error_handler(|err, _req| {
                 let api_err = errors::ApiError::Validation {
                     field: "body".to_string(),
@@ -65,7 +69,10 @@ fn init_http_server(app_config: AppConfig) -> io::Result<Server> {
             .service(missing_blobs_api)
             .service(export_blobs_api)
             .service(upload_blobs_api)
-            .service(export_blobs_ws_api)
+            .service(enqueue_export_blobs_job_api)
+            .service(list_jobs_api)
+            .service(get_job_api)
+            .service(cancel_job_api)
             .service(activate_account_api)
             .service(deactivate_account_api)
             .service(migrate_preferences_api)
