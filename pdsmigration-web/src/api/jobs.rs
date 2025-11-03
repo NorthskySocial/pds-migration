@@ -85,7 +85,23 @@ pub async fn cancel_job_api(
     path = "/jobs/{id}",
     params(("id" = String, Path, description = "Job ID (UUID)")),
     responses(
-        (status = 200, description = "Job details", body = JobRecord, content_type = "application/json"),
+        (status = 200, description = "Job details", body = JobRecord, content_type = "application/json",
+            example = json!({
+                "id": "550e8400-e29b-41d4-a716-446655440000",
+                "kind": "ExportBlobs",
+                "status": "Success",
+                "created_at": 1700000000,
+                "started_at": 1700000001,
+                "finished_at": 1700000100,
+                "progress": {
+                    "successful_blobs": 1,
+                    "successful_blobs_ids": ["550e8400-e29b-41d4-a716-446655440000"],
+                    "invalid_blobs": 1,
+                    "invalid_blob_ids": ["550e8400-e29b-41d4-a716-446655440001"],
+                    "total": 2
+                }
+            })
+        ),
         (status = 404, description = "Not found"),
     ),
     tag = "pdsmigration-web"
