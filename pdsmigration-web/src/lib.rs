@@ -1,4 +1,5 @@
 pub mod api;
+pub mod background_jobs;
 pub mod config;
 pub mod errors;
 

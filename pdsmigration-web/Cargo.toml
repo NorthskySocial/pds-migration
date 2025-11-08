@@ -37,6 +37,7 @@ futures-util = { version = "0.3.31" }
 futures = { version = "0.3.31" }
 actix-ws = "0.3.0"
 tokio = "1.48.0"
+uuid = { version = "1.10.0", features = ["v4", "serde"] }
 
 [dev-dependencies]
 actix-web = { version = "4.8.0", features = ["macros"] }
