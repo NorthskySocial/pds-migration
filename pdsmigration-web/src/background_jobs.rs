@@ -5,6 +5,7 @@ use pdsmigration_common::{
     MigrationError,
 };
 use serde::{Deserialize, Serialize};
+#[allow(unused_imports)] // Used in schema attribute macros
 use serde_json::json;
 use std::collections::HashMap;
 use std::io::ErrorKind;
