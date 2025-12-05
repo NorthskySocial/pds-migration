@@ -17,6 +17,7 @@ name = "pdsmigration_web"
 path = "src/lib.rs"
 
 [dependencies]
+flate2 = { workspace = true }
 dotenvy = "0.15.7"
 actix-rt = "2.10.0"
 actix-web = "4.8.0"
