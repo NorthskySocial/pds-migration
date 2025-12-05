@@ -6,6 +6,7 @@ resolver = "2"
 
 [workspace.dependencies]
 pdsmigration-common = { path = "pdsmigration-common", version = "0.1.0" }
+flate2 = ">=1.1.5, <1.1.6"
 
 [profile.release]
 debug = 2  # Or any level from 0 to 2
