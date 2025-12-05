@@ -44,6 +44,8 @@ fn init_http_server(app_config: AppConfig) -> io::Result<Server> {
         .endpoint("/metrics")
         .build()
         .expect("Failed to build prometheus metrics");
+    let job_manager = web::Data::new(JobManager::new());
+
     let server = HttpServer::new(move || {
         App::new()
             .wrap(prometheus.clone())
@@ -54,7 +56,7 @@ fn init_http_server(app_config: AppConfig) -> io::Result<Server> {
             ))
             .wrap(middleware::auth_token::AuthToken::new())
             .app_data(web::Data::new(app_config.clone()))
-            .app_data(web::Data::new(JobManager::new()))
+            .app_data(job_manager.clone())
             .app_data(web::JsonConfig::default().error_handler(|err, _req| {
                 let api_err = errors::ApiError::Validation {
                     field: "body".to_string(),
