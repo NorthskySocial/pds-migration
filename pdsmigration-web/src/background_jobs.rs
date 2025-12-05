@@ -332,7 +332,10 @@ async fn export_blobs_api_job(
                             tokio::time::sleep(five_minutes).await;
                         }
                         _ => {
-                            tracing::error!("Unexpected error when downloading blob: {}", e.to_string());
+                            tracing::error!(
+                                "Unexpected error when downloading blob: {}",
+                                e.to_string()
+                            );
                         }
                     }
                     tracing::error!("Failed to download missing blob with cid: {}", blob_cid_str);
