@@ -117,7 +117,12 @@ pub async fn get_job_api(
 
     match jobs.get(id).await {
         Some(job) => {
-            tracing::info!("Job found - ID: {}, status: {:?}, kind: {:?}", id, job.status, job.kind);
+            tracing::info!(
+                "Job found - ID: {}, status: {:?}, kind: {:?}",
+                id,
+                job.status,
+                job.kind
+            );
             Ok(HttpResponse::Ok().json(job))
         }
         None => {
