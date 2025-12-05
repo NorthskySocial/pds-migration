@@ -12,6 +12,7 @@ repository = "https://github.com/NorthskySocial/pds-migration"
 description = "Common framework for PDS Migration"
 
 [dependencies]
+flate2 = { workspace = true }
 serde = { version = "1.0.204", features = ["derive"] }
 bsky-sdk = "0.1.21"
 ipld-core = "0.4.1"

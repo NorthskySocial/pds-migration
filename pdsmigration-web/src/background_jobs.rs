@@ -332,13 +332,13 @@ async fn export_blobs_api_job(
                             tokio::time::sleep(five_minutes).await;
                         }
                         _ => {
-                            tracing::error!("Failed to determine missing blobs");
-                            return Err(MigrationError::Runtime {
-                                message: e.to_string(),
-                            });
+                            tracing::error!(
+                                "Unexpected error when downloading blob: {}",
+                                e.to_string()
+                            );
                         }
                     }
-                    tracing::error!("Failed to determine missing blobs");
+                    tracing::error!("Failed to download missing blob with cid: {}", blob_cid_str);
                     invalid_blobs.push(blob_cid_str.clone());
                     {
                         let mut st = state.write().await;
