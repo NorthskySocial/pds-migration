@@ -113,6 +113,10 @@ pub async fn get_job_api(
     path: web::Path<(Uuid,)>,
 ) -> Result<HttpResponse, ApiError> {
     let id = path.into_inner().0;
+    let list = jobs.list().await;
+    let job_ids: Vec<String> = list.iter().map(|job| job.id.clone()).collect();
+    tracing::info!(request_guid = %id, job_ids = ?job_ids, "Getting job with ID: {}", id);
+
     match jobs.get(id).await {
         Some(job) => Ok(HttpResponse::Ok().json(job)),
         None => Ok(HttpResponse::NotFound().finish()),
