@@ -203,7 +203,7 @@ impl Default for JobManager {
     }
 }
 
-#[tracing::instrument]
+#[tracing::instrument(skip(state))]
 async fn export_blobs_api_job(
     id: Uuid,
     state: Arc<RwLock<JobState>>,
