@@ -40,6 +40,7 @@ pub const APPLICATION_JSON: &str = "application/json";
 fn init_http_server(app_config: AppConfig) -> io::Result<Server> {
     let server_port = app_config.server.port;
     let worker_count = app_config.server.workers;
+    let job_manager = JobManager::new();
     let prometheus = PrometheusMetricsBuilder::new("api")
         .endpoint("/metrics")
         .build()
@@ -54,7 +55,7 @@ fn init_http_server(app_config: AppConfig) -> io::Result<Server> {
             ))
             .wrap(middleware::auth_token::AuthToken::new())
             .app_data(web::Data::new(app_config.clone()))
-            .app_data(web::Data::new(JobManager::new()))
+            .app_data(web::Data::new(job_manager.clone()))
             .app_data(web::JsonConfig::default().error_handler(|err, _req| {
                 let api_err = errors::ApiError::Validation {
                     field: "body".to_string(),
