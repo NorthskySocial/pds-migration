@@ -8,7 +8,7 @@ COPY pdsmigration-common pdsmigration-common
 COPY pdsmigration-gui pdsmigration-gui
 COPY pdsmigration-web pdsmigration-web
 
-RUN cargo build --release --strip --package pdsmigration-web
+RUN cargo build --release --package pdsmigration-web
 
 FROM debian:bookworm-slim
 
