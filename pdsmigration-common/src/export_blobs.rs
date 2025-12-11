@@ -7,13 +7,25 @@ use std::io::ErrorKind;
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Deserialize, Serialize)]
 pub struct ExportBlobsRequest {
     pub destination: String,
     pub origin: String,
     pub did: String,
     pub origin_token: String,
     pub destination_token: String,
+}
+
+impl std::fmt::Debug for ExportBlobsRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ExportBlobsRequest")
+            .field("destination", &self.destination)
+            .field("origin", &self.origin)
+            .field("did", &self.did)
+            .field("origin_token", &"[REDACTED]")
+            .field("destination_token", &"[REDACTED]")
+            .finish()
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -147,4 +159,32 @@ pub async fn export_blobs_api(
         successful_blobs,
         invalid_blobs,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_export_blobs_request_redacts_tokens() {
+        let request = ExportBlobsRequest {
+            destination: "https://destination.example.com".to_string(),
+            origin: "https://origin.example.com".to_string(),
+            did: "did:plc:example123".to_string(),
+            origin_token: "secret-origin-token-12345".to_string(),
+            destination_token: "secret-destination-token-67890".to_string(),
+        };
+
+        let debug_output = format!("{:?}", request);
+
+        // Verify that the sensitive tokens are redacted
+        assert!(debug_output.contains("[REDACTED]"));
+        assert!(!debug_output.contains("secret-origin-token-12345"));
+        assert!(!debug_output.contains("secret-destination-token-67890"));
+
+        // Verify that non-sensitive fields are still visible
+        assert!(debug_output.contains("https://destination.example.com"));
+        assert!(debug_output.contains("https://origin.example.com"));
+        assert!(debug_output.contains("did:plc:example123"));
+    }
 }
