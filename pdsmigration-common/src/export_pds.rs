@@ -5,11 +5,21 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Deserialize, Serialize)]
 pub struct ExportPDSRequest {
     pub pds_host: String,
     pub did: String,
     pub token: String,
+}
+
+impl std::fmt::Debug for ExportPDSRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ExportPDSRequest")
+            .field("pds_host", &self.pds_host)
+            .field("did", &self.did)
+            .field("token", &"[REDACTED]")
+            .finish()
+    }
 }
 
 #[tracing::instrument(skip(req))]

@@ -35,10 +35,19 @@ pub use request_token::*;
 pub use service_auth::*;
 pub use upload_blobs::*;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Deserialize, Serialize)]
 pub struct GetRepoRequest {
     pub did: Did,
     pub token: String,
+}
+
+impl std::fmt::Debug for GetRepoRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GetRepoRequest")
+            .field("did", &self.did)
+            .field("token", &"[REDACTED]")
+            .finish()
+    }
 }
 
 pub fn multicodec_wrap(bytes: Vec<u8>) -> Vec<u8> {
