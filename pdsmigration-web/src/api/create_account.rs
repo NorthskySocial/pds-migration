@@ -105,6 +105,7 @@ pub async fn create_account_api(
     )
     .await
     .map_err(ApiError::from)?;
-    tracing::info!("Account created successfully");
+
+    tracing::info!("Account created successfully - Used invite code {}", req.invite_code);
     Ok(HttpResponse::Ok().finish())
 }
