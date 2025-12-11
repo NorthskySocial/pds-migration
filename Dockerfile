@@ -10,13 +10,11 @@ COPY pdsmigration-web pdsmigration-web
 
 RUN cargo build --release --package pdsmigration-web
 
-FROM debian:bookworm-slim
+FROM rust:slim
 
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /app/target/release/pdsmigration-web/ .
 
-COPY --from=builder /app/target/release/pdsmigration-web /app/
-
-ENTRYPOINT ["/app/pdsmigration-web"]
+ENTRYPOINT ["./pdsmigration-web"]
 
 LABEL org.opencontainers.image.source=https://github.com/NorthskySocial/pds-migration
 LABEL org.opencontainers.image.description="PDS migration tool"
