@@ -3,22 +3,43 @@ use crate::{build_agent, MigrationError};
 use bsky_sdk::api::types::string::Did;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::io::ErrorKind;
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Deserialize, Serialize)]
 pub struct GetBlobRequest {
     pub did: Did,
     pub cid: String,
     pub token: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+impl fmt::Debug for GetBlobRequest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("GetBlobRequest")
+            .field("did", &self.did)
+            .field("cid", &self.cid)
+            .field("token", &"[REDACTED]")
+            .finish()
+    }
+}
+
+#[derive(Deserialize, Serialize)]
 pub struct ExportAllBlobsRequest {
     pub origin: String,
     pub did: String,
     pub origin_token: String,
+}
+
+impl fmt::Debug for ExportAllBlobsRequest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ExportAllBlobsRequest")
+            .field("origin", &self.origin)
+            .field("did", &self.did)
+            .field("origin_token", &"[REDACTED]")
+            .finish()
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]

@@ -1,4 +1,4 @@
-FROM rust:latest AS builder
+FROM rust:1.91 AS builder
 
 # Copy local code to the container image.
 WORKDIR /app
@@ -10,7 +10,7 @@ COPY pdsmigration-web pdsmigration-web
 
 RUN cargo build --release --package pdsmigration-web
 
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 
