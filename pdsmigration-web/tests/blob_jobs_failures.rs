@@ -1,6 +1,7 @@
 use pdsmigration_common::{did_blobs_path, ExportBlobsRequest, UploadBlobsRequest};
-use pdsmigration_web::background_jobs::{JobManager, JobStatus};
+use pdsmigration_web::background_jobs::{JobManager, JobStatus, DEFAULT_JOB_RETENTION_SECS};
 use serde_json::json;
+use std::time::Duration;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -45,7 +46,7 @@ async fn export_job_records_failed_blob_but_still_succeeds() {
     let blob_dir = did_blobs_path(&did).expect("downloads dir resolvable");
     let _ = std::fs::remove_dir_all(&blob_dir);
 
-    let jobs = JobManager::new();
+    let jobs = JobManager::new(Duration::from_secs(DEFAULT_JOB_RETENTION_SECS));
     let export_id = jobs
         .spawn_export_blobs(ExportBlobsRequest {
             destination: destination.uri(),
@@ -108,7 +109,7 @@ async fn upload_job_retries_once_and_succeeds() {
     std::fs::create_dir_all(&blob_dir).expect("create blob dir");
     std::fs::write(blob_dir.join("blob-one"), b"retry-me").expect("seed blob");
 
-    let jobs = JobManager::new();
+    let jobs = JobManager::new(Duration::from_secs(DEFAULT_JOB_RETENTION_SECS));
     let upload_id = jobs
         .spawn_upload_blobs(
             UploadBlobsRequest {
@@ -174,7 +175,7 @@ async fn upload_job_records_invalid_when_both_attempts_fail() {
     std::fs::create_dir_all(&blob_dir).expect("create blob dir");
     std::fs::write(blob_dir.join("blob-bad"), b"no good").expect("seed blob");
 
-    let jobs = JobManager::new();
+    let jobs = JobManager::new(Duration::from_secs(DEFAULT_JOB_RETENTION_SECS));
     let upload_id = jobs
         .spawn_upload_blobs(
             UploadBlobsRequest {
@@ -245,7 +246,7 @@ async fn upload_job_first_pass_exhausts_retries_then_second_pass_succeeds() {
     std::fs::create_dir_all(&blob_dir).expect("create blob dir");
     std::fs::write(blob_dir.join("blob-eventual"), b"second-pass-recovers").expect("seed blob");
 
-    let jobs = JobManager::new();
+    let jobs = JobManager::new(Duration::from_secs(DEFAULT_JOB_RETENTION_SECS));
     let upload_id = jobs
         .spawn_upload_blobs(
             UploadBlobsRequest {
@@ -312,7 +313,7 @@ async fn upload_job_marks_invalid_when_first_pass_retries_and_second_pass_all_fa
     std::fs::create_dir_all(&blob_dir).expect("create blob dir");
     std::fs::write(blob_dir.join("blob-doomed"), b"never works").expect("seed blob");
 
-    let jobs = JobManager::new();
+    let jobs = JobManager::new(Duration::from_secs(DEFAULT_JOB_RETENTION_SECS));
     let upload_id = jobs
         .spawn_upload_blobs(
             UploadBlobsRequest {

@@ -1,6 +1,7 @@
 use pdsmigration_common::{did_blobs_path, ExportBlobsRequest};
-use pdsmigration_web::background_jobs::{JobManager, JobStatus};
+use pdsmigration_web::background_jobs::{JobManager, JobStatus, DEFAULT_JOB_RETENTION_SECS};
 use serde_json::json;
+use std::time::Duration;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -76,7 +77,7 @@ async fn export_blobs_job_reactivates_deactivated_origin() {
     let blob_dir = did_blobs_path(&did).expect("downloads dir resolvable");
     let _ = std::fs::remove_dir_all(&blob_dir);
 
-    let jobs = JobManager::new();
+    let jobs = JobManager::new(Duration::from_secs(DEFAULT_JOB_RETENTION_SECS));
     let export_id = jobs
         .spawn_export_blobs(ExportBlobsRequest {
             destination: destination.uri(),
@@ -179,7 +180,7 @@ async fn export_blobs_job_leaves_active_origin_untouched() {
     let blob_dir = did_blobs_path(&did).expect("downloads dir resolvable");
     let _ = std::fs::remove_dir_all(&blob_dir);
 
-    let jobs = JobManager::new();
+    let jobs = JobManager::new(Duration::from_secs(DEFAULT_JOB_RETENTION_SECS));
     let export_id = jobs
         .spawn_export_blobs(ExportBlobsRequest {
             destination: destination.uri(),
@@ -269,7 +270,7 @@ async fn export_blobs_job_skips_activation_check_on_regular_flow() {
     let blob_dir = did_blobs_path(&did).expect("downloads dir resolvable");
     let _ = std::fs::remove_dir_all(&blob_dir);
 
-    let jobs = JobManager::new();
+    let jobs = JobManager::new(Duration::from_secs(DEFAULT_JOB_RETENTION_SECS));
     let export_id = jobs
         .spawn_export_blobs(ExportBlobsRequest {
             destination: destination.uri(),

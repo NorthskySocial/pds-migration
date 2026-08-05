@@ -37,7 +37,7 @@ use utoipa_swagger_ui::SwaggerUi;
 fn init_http_server(app_config: AppConfig) -> io::Result<Server> {
     let server_port = app_config.server.port;
     let worker_count = app_config.server.workers;
-    let job_manager = JobManager::new();
+    let job_manager = JobManager::new(Duration::from_secs(app_config.server.job_retention_secs));
     let prometheus = PrometheusMetricsBuilder::new("api")
         .endpoint("/metrics")
         .build()
@@ -133,6 +133,7 @@ mod tests {
                 upload_max_attempts: 4,
                 rate_limit_window_secs: 60,
                 rate_limit_max_requests: 60,
+                job_retention_secs: 3600,
                 auth_token: None,
             },
             external_services: ExternalServices {
@@ -155,6 +156,7 @@ mod tests {
                 upload_max_attempts: 4,
                 rate_limit_window_secs: 60,
                 rate_limit_max_requests: 60,
+                job_retention_secs: 3600,
                 auth_token: None,
             },
             external_services: ExternalServices {

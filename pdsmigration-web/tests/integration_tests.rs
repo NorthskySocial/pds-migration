@@ -6,11 +6,12 @@ use pdsmigration_web::{
         export_pds_api, get_job_api, get_service_auth_api, health_check, import_pds_api,
         migrate_plc_api, migrate_preferences_api, request_token_api,
     },
-    background_jobs::JobManager,
+    background_jobs::{JobManager, DEFAULT_JOB_RETENTION_SECS},
     config::{AppConfig, ExternalServices, ServerConfig},
     APPLICATION_JSON,
 };
 use serde_json::json;
+use std::time::Duration;
 
 #[cfg(test)]
 mod integration_tests {
@@ -25,6 +26,7 @@ mod integration_tests {
                 upload_max_attempts: 4,
                 rate_limit_window_secs: 60,
                 rate_limit_max_requests: 60,
+                job_retention_secs: 3600,
                 auth_token: None,
             },
             external_services: ExternalServices {
@@ -56,7 +58,9 @@ mod integration_tests {
     #[actix_rt::test]
     async fn test_all_routes_configured() {
         let app_config = create_test_config();
-        let job_manager = web::Data::new(JobManager::new());
+        let job_manager = web::Data::new(JobManager::new(Duration::from_secs(
+            DEFAULT_JOB_RETENTION_SECS,
+        )));
 
         // Test that we can create an app with all routes without errors
         let _app = test::init_service(
@@ -349,7 +353,9 @@ mod integration_tests {
     #[actix_rt::test]
     async fn test_enqueue_export_blobs_job_missing_fields() {
         let app_config = create_test_config();
-        let job_manager = web::Data::new(JobManager::new());
+        let job_manager = web::Data::new(JobManager::new(Duration::from_secs(
+            DEFAULT_JOB_RETENTION_SECS,
+        )));
 
         let app = test::init_service(
             App::new()
@@ -371,7 +377,9 @@ mod integration_tests {
     #[actix_rt::test]
     async fn test_get_nonexistent_job() {
         let app_config = create_test_config();
-        let job_manager = web::Data::new(JobManager::new());
+        let job_manager = web::Data::new(JobManager::new(Duration::from_secs(
+            DEFAULT_JOB_RETENTION_SECS,
+        )));
 
         let app = test::init_service(
             App::new()
@@ -392,7 +400,9 @@ mod integration_tests {
     #[actix_rt::test]
     async fn test_get_job_with_invalid_uuid_format() {
         let app_config = create_test_config();
-        let job_manager = web::Data::new(JobManager::new());
+        let job_manager = web::Data::new(JobManager::new(Duration::from_secs(
+            DEFAULT_JOB_RETENTION_SECS,
+        )));
 
         let app = test::init_service(
             App::new()
@@ -413,7 +423,9 @@ mod integration_tests {
     #[actix_rt::test]
     async fn test_get_existing_job() {
         let app_config = create_test_config();
-        let job_manager = web::Data::new(JobManager::new());
+        let job_manager = web::Data::new(JobManager::new(Duration::from_secs(
+            DEFAULT_JOB_RETENTION_SECS,
+        )));
 
         let app = test::init_service(
             App::new()
@@ -460,7 +472,9 @@ mod integration_tests {
     #[actix_rt::test]
     async fn test_enqueue_upload_blobs_job_missing_fields() {
         let app_config = create_test_config();
-        let job_manager = web::Data::new(JobManager::new());
+        let job_manager = web::Data::new(JobManager::new(Duration::from_secs(
+            DEFAULT_JOB_RETENTION_SECS,
+        )));
 
         let app = test::init_service(
             App::new()
@@ -482,7 +496,9 @@ mod integration_tests {
     #[actix_rt::test]
     async fn test_enqueue_export_repo_job_missing_fields() {
         let app_config = create_test_config();
-        let job_manager = web::Data::new(JobManager::new());
+        let job_manager = web::Data::new(JobManager::new(Duration::from_secs(
+            DEFAULT_JOB_RETENTION_SECS,
+        )));
 
         let app = test::init_service(
             App::new()
@@ -504,7 +520,9 @@ mod integration_tests {
     #[actix_rt::test]
     async fn test_get_existing_export_repo_job() {
         let app_config = create_test_config();
-        let job_manager = web::Data::new(JobManager::new());
+        let job_manager = web::Data::new(JobManager::new(Duration::from_secs(
+            DEFAULT_JOB_RETENTION_SECS,
+        )));
 
         let app = test::init_service(
             App::new()
@@ -548,7 +566,9 @@ mod integration_tests {
     #[actix_rt::test]
     async fn test_get_existing_upload_blobs_job() {
         let app_config = create_test_config();
-        let job_manager = web::Data::new(JobManager::new());
+        let job_manager = web::Data::new(JobManager::new(Duration::from_secs(
+            DEFAULT_JOB_RETENTION_SECS,
+        )));
 
         let app = test::init_service(
             App::new()

@@ -2,7 +2,7 @@ use actix_web::{http::StatusCode, test, web, App};
 use pdsmigration_common::did_blobs_path;
 use pdsmigration_web::{
     api::{enqueue_export_blobs_job_api, get_job_api},
-    background_jobs::JobManager,
+    background_jobs::{JobManager, DEFAULT_JOB_RETENTION_SECS},
 };
 use serde_json::json;
 use std::time::Duration;
@@ -52,7 +52,9 @@ async fn export_job_reaches_success_through_http_api() {
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(create_test_config()))
-            .app_data(web::Data::new(JobManager::new()))
+            .app_data(web::Data::new(JobManager::new(Duration::from_secs(
+                DEFAULT_JOB_RETENTION_SECS,
+            ))))
             .service(enqueue_export_blobs_job_api)
             .service(get_job_api),
     )

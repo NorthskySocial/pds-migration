@@ -1,6 +1,7 @@
 use pdsmigration_common::{did_blobs_path, ExportBlobsRequest, UploadBlobsRequest};
-use pdsmigration_web::background_jobs::{JobManager, JobStatus};
+use pdsmigration_web::background_jobs::{JobManager, JobStatus, DEFAULT_JOB_RETENTION_SECS};
 use serde_json::json;
+use std::time::Duration;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -63,7 +64,7 @@ async fn job_manager_blob_roundtrip() {
     let blob_dir = did_blobs_path(&did).expect("downloads dir resolvable");
     let _ = std::fs::remove_dir_all(&blob_dir);
 
-    let jobs = JobManager::new();
+    let jobs = JobManager::new(Duration::from_secs(DEFAULT_JOB_RETENTION_SECS));
 
     // Run the export job through the JobManager.
     let export_id = jobs
