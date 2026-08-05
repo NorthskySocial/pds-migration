@@ -110,6 +110,7 @@ cargo test -p pdsmigration-common
 | `SERVER_PORT`              | No       | `9090`                  | HTTP server port                      |
 | `WORKER_COUNT`             | No       | `2`                     | Number of worker threads              |
 | `CONCURRENT_TASKS_PER_JOB` | No       | `3`                     | Max concurrent blob processes per job |
+| `JOB_RETENTION_SECS`       | No       | `3600`                  | How long finished jobs are kept in memory before being pruned |
 
 ### AWS S3 Configuration
 

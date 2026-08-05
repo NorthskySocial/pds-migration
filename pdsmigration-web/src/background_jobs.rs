@@ -23,6 +23,7 @@ use uuid::Uuid;
 const MAX_BACKOFF_MS: u64 = 10_000;
 const BASE_BACKOFF_MS: u64 = 250;
 const BACKOFF_JITTER_MS: u64 = 250;
+pub const DEFAULT_JOB_RETENTION_SECS: u64 = 3600;
 
 fn backoff_base_ms(attempt: u32) -> u64 {
     let shift = attempt.min(6);
@@ -125,6 +126,7 @@ impl JobRecord {
 #[derive(Clone)]
 pub struct JobManager {
     state: Arc<RwLock<JobState>>,
+    retention: Duration,
 }
 
 #[derive(Default, Debug)]
@@ -133,6 +135,15 @@ struct JobState {
 }
 
 impl JobState {
+    pub fn prune_finished(&mut self, retention: Duration) {
+        let now = now_millis();
+        let retention_ms = retention.as_millis() as u64;
+        self.records.retain(|_, r| match r.finished_at {
+            Some(finished_at) => now.saturating_sub(finished_at) < retention_ms,
+            None => true,
+        });
+    }
+
     pub fn set_running(&mut self, id: Uuid) {
         if let Some(r) = self.records.get_mut(&id) {
             r.status = JobStatus::Running;
@@ -210,9 +221,10 @@ impl JobState {
 }
 
 impl JobManager {
-    pub fn new() -> Self {
+    pub fn new(retention: Duration) -> Self {
         Self {
             state: Arc::new(RwLock::new(JobState::default())),
+            retention,
         }
     }
 
@@ -243,6 +255,7 @@ impl JobManager {
 
         {
             let mut st = self.state.write().await;
+            st.prune_finished(self.retention);
             st.records.insert(id, rec);
         }
 
@@ -275,6 +288,7 @@ impl JobManager {
 
         {
             let mut st = self.state.write().await;
+            st.prune_finished(self.retention);
             st.records.insert(id, rec);
         }
 
@@ -308,6 +322,7 @@ impl JobManager {
 
         {
             let mut st = self.state.write().await;
+            st.prune_finished(self.retention);
             st.records.insert(id, rec);
             st.update_total(id, 1);
         }
@@ -331,7 +346,7 @@ impl JobManager {
 
 impl Default for JobManager {
     fn default() -> Self {
-        Self::new()
+        Self::new(Duration::from_secs(DEFAULT_JOB_RETENTION_SECS))
     }
 }
 
@@ -1013,15 +1028,47 @@ mod tests {
         assert!(state.records.is_empty());
     }
 
+    #[test]
+    fn test_prune_finished_drops_only_expired_jobs() {
+        let mut state = JobState::default();
+
+        // Finished long ago, should be pruned.
+        let old_id = Uuid::new_v4();
+        let mut old = JobRecord::new(old_id, JobKind::UploadBlobs);
+        old.status = JobStatus::Success;
+        old.finished_at = Some(now_millis().saturating_sub(10_000));
+        state.records.insert(old_id, old);
+
+        // Finished just now, should be kept.
+        let recent_id = Uuid::new_v4();
+        let mut recent = JobRecord::new(recent_id, JobKind::UploadBlobs);
+        recent.status = JobStatus::Success;
+        recent.finished_at = Some(now_millis());
+        state.records.insert(recent_id, recent);
+
+        // Still running (no finished_at), should always be kept.
+        let running_id = Uuid::new_v4();
+        state
+            .records
+            .insert(running_id, JobRecord::new(running_id, JobKind::UploadBlobs));
+        state.set_running(running_id);
+
+        state.prune_finished(Duration::from_secs(5));
+
+        assert!(!state.records.contains_key(&old_id));
+        assert!(state.records.contains_key(&recent_id));
+        assert!(state.records.contains_key(&running_id));
+    }
+
     #[actix_rt::test]
     async fn test_job_manager_get_returns_none_when_unknown() {
-        let mgr = JobManager::new();
+        let mgr = JobManager::new(Duration::from_secs(DEFAULT_JOB_RETENTION_SECS));
         assert!(mgr.get(Uuid::new_v4()).await.is_none());
     }
 
     #[actix_rt::test]
     async fn test_job_manager_get_after_manual_insert() {
-        let mgr = JobManager::new();
+        let mgr = JobManager::new(Duration::from_secs(DEFAULT_JOB_RETENTION_SECS));
         let id = Uuid::new_v4();
         {
             let mut st = mgr.state.write().await;

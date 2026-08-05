@@ -20,6 +20,7 @@ pub fn create_test_config() -> AppConfig {
             upload_max_attempts: 4,
             rate_limit_window_secs: 60,
             rate_limit_max_requests: 60,
+            job_retention_secs: 3600,
             auth_token: None,
         },
         external_services: ExternalServices {

@@ -1,5 +1,5 @@
 use pdsmigration_common::{did_blobs_path, UploadBlobsRequest};
-use pdsmigration_web::background_jobs::{JobManager, JobStatus};
+use pdsmigration_web::background_jobs::{JobManager, JobStatus, DEFAULT_JOB_RETENTION_SECS};
 use std::time::Duration;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -43,7 +43,7 @@ async fn upload_job_retries_after_request_timeout() {
     std::fs::create_dir_all(&blob_dir).expect("create blob dir");
     std::fs::write(blob_dir.join("blob-slow"), b"slow-then-fast").expect("seed blob");
 
-    let jobs = JobManager::new();
+    let jobs = JobManager::new(Duration::from_secs(DEFAULT_JOB_RETENTION_SECS));
     let upload_id = jobs
         .spawn_upload_blobs(
             UploadBlobsRequest {
