@@ -175,7 +175,7 @@ pub async fn upload_blob(agent: &BskyAgent, input: Vec<u8>) -> Result<(), Migrat
 #[tracing::instrument(skip(agent, input))]
 pub async fn upload_blob_v2(
     agent: &BskyAgent,
-    input: Vec<u8>,
+    input: bytes::Bytes,
     blob_id: &str,
 ) -> Result<(), MigrationError> {
     let pds_host = agent.get_endpoint().await;

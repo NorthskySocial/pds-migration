@@ -5,8 +5,8 @@ use futures_util::StreamExt;
 use pdsmigration_common::{
     activate_account_agent, build_agent, deactivate_account, did_blobs_path, did_to_car_filename,
     download_blob, format_cid, login_helper, missing_blobs, repo_car_path, upload_blob_v2,
-    wait_for_rate_limit, ExportBlobsRequest, ExportPDSRequest, GetBlobRequest, MigrationError,
-    UploadBlobsRequest,
+    wait_for_rate_limit, Bytes, ExportBlobsRequest, ExportPDSRequest, GetBlobRequest,
+    MigrationError, UploadBlobsRequest,
 };
 use serde::{Deserialize, Serialize};
 #[allow(unused_imports)] // Used in schema attribute macros
@@ -569,9 +569,14 @@ async fn upload_blobs_api_job(
                     blob_cid_str,
                     file.len()
                 );
-                let result =
-                    upload_blob_with_retries(&agent, file, &blob_cid_str, &did_inner, max_attempts)
-                        .await;
+                let result = upload_blob_with_retries(
+                    &agent,
+                    Bytes::from(file),
+                    &blob_cid_str,
+                    &did_inner,
+                    max_attempts,
+                )
+                .await;
                 (path, blob_cid_str, result)
             }
         })
@@ -617,7 +622,7 @@ async fn upload_blobs_api_job(
                     continue;
                 }
             };
-            match upload_blob_v2(&agent, file, &blob_cid_str).await {
+            match upload_blob_v2(&agent, Bytes::from(file), &blob_cid_str).await {
                 Ok(()) => {
                     tracing::info!(
                         "[{}][{}] Second pass succeeded for blob {}",
@@ -752,7 +757,7 @@ pub async fn export_repo_to_s3(
 /// Upload a single blob, retrying transient failures with exponential backoff.
 async fn upload_blob_with_retries(
     agent: &bsky_sdk::BskyAgent,
-    file: Vec<u8>,
+    file: Bytes,
     blob_cid: &str,
     did: &str,
     max_attempts: u32,
