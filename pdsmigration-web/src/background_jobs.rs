@@ -1051,6 +1051,7 @@ mod tests {
         state
             .records
             .insert(running_id, JobRecord::new(running_id, JobKind::UploadBlobs));
+        state.set_running(running_id);
 
         state.prune_finished(Duration::from_secs(5));
 
