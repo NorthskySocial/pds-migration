@@ -24,7 +24,7 @@ unsigned-varint = "0.8.0"
 rand = "0.9.1"
 tracing-subscriber = { workspace = true }
 tracing = { workspace = true }
-egui_extras = { version = "0.32", features = ["default", "image"] }
+egui_extras = { version = "0.32", default-features = false, features = ["image"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 base64ct = { version = "1.8.0", features = ["alloc"] }
