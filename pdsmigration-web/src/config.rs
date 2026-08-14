@@ -40,8 +40,14 @@ impl AppConfig {
         let job_retention_secs = env::var("JOB_RETENTION_SECS").unwrap_or("3600".to_string());
         let artifact_retention_secs =
             env::var("ARTIFACT_RETENTION_SECS").unwrap_or("86400".to_string());
-        let artifact_gc_interval_secs =
-            env::var("ARTIFACT_GC_INTERVAL_SECS").unwrap_or("3600".to_string());
+        let artifact_gc_interval_secs: u64 = env::var("ARTIFACT_GC_INTERVAL_SECS")
+            .unwrap_or("3600".to_string())
+            .parse()
+            .unwrap();
+        assert!(
+            artifact_gc_interval_secs > 0,
+            "ARTIFACT_GC_INTERVAL_SECS must be greater than zero"
+        );
 
         Self {
             server: ServerConfig {
@@ -53,7 +59,7 @@ impl AppConfig {
                 rate_limit_max_requests: rate_limit_max_requests.parse().unwrap(),
                 job_retention_secs: job_retention_secs.parse().unwrap(),
                 artifact_retention_secs: artifact_retention_secs.parse().unwrap(),
-                artifact_gc_interval_secs: artifact_gc_interval_secs.parse().unwrap(),
+                artifact_gc_interval_secs,
                 auth_token: env::var("AUTH_TOKEN").ok(),
             },
             external_services: ExternalServices { s3_endpoint },
@@ -179,6 +185,20 @@ mod tests {
             &[
                 ("ENDPOINT", Some("https://s3.example.com")),
                 ("SERVER_PORT", Some("not-a-number")),
+            ],
+            || {
+                let _ = AppConfig::from_env();
+            },
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "ARTIFACT_GC_INTERVAL_SECS must be greater than zero")]
+    fn from_env_rejects_zero_artifact_gc_interval() {
+        with_env_guard(
+            &[
+                ("ENDPOINT", Some("https://s3.example.com")),
+                ("ARTIFACT_GC_INTERVAL_SECS", Some("0")),
             ],
             || {
                 let _ = AppConfig::from_env();
