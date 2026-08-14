@@ -7,28 +7,31 @@ resolver = "2"
 [workspace.dependencies]
 pdsmigration-common = { path = "pdsmigration-common", version = "0.1.0" }
 
-tokio = "1.48.0"
-reqwest = "0.12.22"
-bsky-sdk = "0.1.24"
-serde = { version = "1.0.218", features = ["derive"] }
-serde_json = "1.0.140"
-derive_more = "2.0.1"
-tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-futures-util = "0.3.31"
-ipld-core = "0.4.1"
+tokio = "1.53.1"
+reqwest = { version = "0.13.4", default-features = false, features = ["default-tls"] }
+bsky-sdk = { version = "0.1.24", default-features = false, features = ["default-client"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+derive_more = "2.1.1"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+futures-util = "0.3.34"
+ipld-core = "0.4.3"
 
-pretty_assertions = "1.4.1"
-mockall = "0.14.0"
-tokio-test = "0.4.4"
-wiremock = "0.6.2"
+wiremock = "0.6.5"
+
+[profile.dev]
+debug = 2
+
+[profile.test]
+debug = 1
 
 [profile.release]
-debug = 2  # Or any level from 0 to 2
+debug = 0
 
 [profile.release-docker]
 inherits = "release"
-debug = 0
 strip = "symbols"
 lto = "thin"
 codegen-units = 1
+opt-level = 3

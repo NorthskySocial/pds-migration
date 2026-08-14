@@ -1,4 +1,4 @@
-FROM rust:1.95.0-slim AS chef
+FROM rust:1.97-slim AS chef
 WORKDIR /app
 RUN apt-get update \
  && apt-get install --no-install-recommends -y pkg-config libssl-dev curl ca-certificates \
