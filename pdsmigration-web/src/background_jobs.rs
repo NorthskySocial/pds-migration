@@ -233,6 +233,15 @@ impl JobManager {
         st.records.get(&id).cloned()
     }
 
+    /// True while any job is queued or running, meaning on-disk
+    /// migration artifacts may still be in use.
+    pub async fn has_active_jobs(&self) -> bool {
+        let st = self.state.read().await;
+        st.records
+            .values()
+            .any(|r| matches!(r.status, JobStatus::Queued | JobStatus::Running))
+    }
+
     #[tracing::instrument(skip(self))]
     pub async fn spawn_upload_blobs(
         &self,

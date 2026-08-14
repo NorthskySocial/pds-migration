@@ -21,6 +21,8 @@ pub fn create_test_config() -> AppConfig {
             rate_limit_window_secs: 60,
             rate_limit_max_requests: 60,
             job_retention_secs: 3600,
+            artifact_retention_secs: 86400,
+            artifact_gc_interval_secs: 3600,
             auth_token: None,
         },
         external_services: ExternalServices {
