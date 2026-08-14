@@ -17,7 +17,7 @@ bsky-sdk = { workspace = true }
 egui = { version = "0.32" }
 eframe = { version = "0.32", features = ["glow", "wgpu"] }
 atrium-xrpc = "0.12.3"
-zip = "4.1.0"
+zip = { version = "4.1.0", default-features = false, features = ["aes-crypto"] }
 secp256k1 = { version = "0.31.0", features = ["rand", "global-context"] }
 multibase = "0.9.1"
 unsigned-varint = "0.8.0"
