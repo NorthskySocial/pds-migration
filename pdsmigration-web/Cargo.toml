@@ -20,14 +20,14 @@ doctest = false
 [dependencies]
 dotenvy = "0.15.7"
 actix-rt = "2.10.0"
-actix-web = "4.8.0"
+actix-web = { version = "4.8.0", default-features = false, features = ["macros"] }
 bsky-sdk = { workspace = true }
 tracing-actix-web = "0.7.19"
 pdsmigration-common = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-aws-config = { version = "1.5.14", features = ["behavior-version-latest"] }
-aws-sdk-s3 = "1.70.0"
+aws-config = { version = "1.5.14", default-features = false, features = ["behavior-version-latest", "default-https-client", "rt-tokio"] }
+aws-sdk-s3 = { version = "1.70.0", default-features = false, features = ["default-https-client", "http-1x", "rt-tokio", "rustls"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 actix-web-prom = "0.10.0"
@@ -35,12 +35,11 @@ derive_more = { workspace = true }
 utoipa = { version = "5.4.0", features = ["actix_extras"] }
 utoipa-swagger-ui = { version = "9.0.2", features = ["actix-web", "debug-embed"] }
 futures-util = { workspace = true }
-tokio = { workspace = true, features = ["full"] }
+tokio = { workspace = true, features = ["fs", "io-util", "rt", "sync", "time"] }
 uuid = { version = "1.10.0", features = ["v4", "serde"] }
 
 [dev-dependencies]
-actix-web = { version = "4.8.0", features = ["macros"] }
 actix-rt = "2.10.0"
 serde_json = { workspace = true }
-tokio = { version = "1.48.0", features = ["macros", "rt-multi-thread", "time"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync", "time"] }
 wiremock = "0.6.2"

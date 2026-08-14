@@ -20,12 +20,18 @@ ipld-core = "0.4.1"
 
 wiremock = "0.6.2"
 
+[profile.dev]
+debug = 2
+
+[profile.test]
+debug = 1
+
 [profile.release]
-debug = 2  # Or any level from 0 to 2
+debug = 0
 
 [profile.release-docker]
 inherits = "release"
-debug = 0
 strip = "symbols"
 lto = "thin"
 codegen-units = 1
+opt-level = 3
