@@ -3,7 +3,7 @@ use crate::app::PdsMigrationApp;
 use crate::errors::GuiError;
 use crate::ipld::cid_for_cbor;
 use crate::session::session_config::{PdsSession, SessionConfig};
-use base64ct::{Base64, Encoding};
+use base64ct::{Base64UrlUnpadded, Encoding};
 use bsky_sdk::api::agent::Configure;
 use bsky_sdk::api::types::string::Did;
 use bsky_sdk::BskyAgent;
@@ -870,7 +870,7 @@ pub fn get_random_str() -> String {
 }
 
 pub fn json_to_b64url<T: Serialize>(obj: &T) -> String {
-    Base64::encode_string(serde_json::to_string(obj).unwrap().as_ref()).replace("=", "")
+    Base64UrlUnpadded::encode_string(serde_json::to_string(obj).unwrap().as_ref())
 }
 
 pub async fn create_service_jwt(params: ServiceJwtParams) -> String {
@@ -910,7 +910,7 @@ pub async fn create_service_jwt(params: ServiceJwtParams) -> String {
     format!(
         "{0}.{1}",
         to_sign_str,
-        base64_url::encode(&compact_sig).replace("=", "") // Base 64 encode signature bytes
+        Base64UrlUnpadded::encode_string(&compact_sig)
     )
 }
 
@@ -933,7 +933,7 @@ where
 
 pub async fn add_signature(mut obj: PlcOperation, key: &SecretKey) -> PlcOperation {
     let sig = atproto_sign(&obj, key).to_vec();
-    obj.sig = Some(base64_url::encode(&sig).replace("=", ""));
+    obj.sig = Some(Base64UrlUnpadded::encode_string(&sig));
     obj
 }
 

@@ -1,5 +1,4 @@
 use eframe::egui::{self, Color32, RichText, ScrollArea, Ui};
-use egui_file_dialog::FileDialog;
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
@@ -149,7 +148,6 @@ pub struct LogViewer {
     show_error: bool,
     filter_text: String,
     auto_scroll: bool,
-    _export_dialog: Option<FileDialog>,
 }
 
 impl Default for LogViewer {
@@ -162,7 +160,6 @@ impl Default for LogViewer {
             show_error: true,
             filter_text: String::new(),
             auto_scroll: true,
-            _export_dialog: None,
         }
     }
 }
@@ -177,7 +174,6 @@ impl LogViewer {
             show_error: true,
             filter_text: String::new(),
             auto_scroll: true,
-            _export_dialog: None,
         }
     }
 

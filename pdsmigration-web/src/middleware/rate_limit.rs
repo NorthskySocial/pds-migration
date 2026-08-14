@@ -1,4 +1,4 @@
-use futures::future::LocalBoxFuture;
+use futures_util::future::LocalBoxFuture;
 use std::collections::HashMap;
 use std::future::{ready, Ready};
 use std::net::IpAddr;

@@ -35,15 +35,12 @@ derive_more = { workspace = true }
 utoipa = { version = "5.4.0", features = ["actix_extras"] }
 utoipa-swagger-ui = { version = "9.0.2", features = ["actix-web", "debug-embed"] }
 futures-util = { workspace = true }
-futures = "0.3.31"
 tokio = { workspace = true, features = ["full"] }
 uuid = { version = "1.10.0", features = ["v4", "serde"] }
 
 [dev-dependencies]
 actix-web = { version = "4.8.0", features = ["macros"] }
 actix-rt = "2.10.0"
-pretty_assertions = { workspace = true }
 serde_json = { workspace = true }
-mockito = "1.4.0"
 tokio = { version = "1.48.0", features = ["macros", "rt-multi-thread", "time"] }
 wiremock = "0.6.2"
