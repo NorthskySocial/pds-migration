@@ -15,6 +15,8 @@ pub async fn run_periodic_gc(jobs: JobManager, retention: Duration, interval: Du
     loop {
         tokio::time::sleep(interval).await;
 
+        let _artifact_gc_guard = jobs.lock_artifact_gc().await;
+
         if jobs.has_active_jobs().await {
             tracing::debug!("Skipping artifact garbage collection: jobs are still active");
             continue;
@@ -96,6 +98,7 @@ fn is_expired(metadata: &std::fs::Metadata, retention: Duration) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pdsmigration_common::ExportBlobsRequest;
     use std::fs;
     use std::time::UNIX_EPOCH;
 
@@ -173,5 +176,39 @@ mod tests {
         assert!(unrelated.exists());
 
         fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn job_cannot_be_admitted_while_collection_guard_is_held() {
+        let jobs = JobManager::default();
+        let collection_guard = jobs.lock_artifact_gc().await;
+        let spawning_jobs = jobs.clone();
+        let mut admission = tokio::spawn(async move {
+            spawning_jobs
+                .spawn_export_blobs(ExportBlobsRequest {
+                    destination: "http://destination.invalid".to_string(),
+                    origin: "http://origin.invalid".to_string(),
+                    did: "did:plc:gc-test".to_string(),
+                    origin_token: "origin-token".to_string(),
+                    destination_token: "destination-token".to_string(),
+                    is_missing_blob_request: true,
+                })
+                .await
+        });
+
+        assert!(
+            tokio::time::timeout(Duration::from_millis(50), &mut admission)
+                .await
+                .is_err()
+        );
+        assert!(!jobs.has_active_jobs().await);
+
+        drop(collection_guard);
+        let id = tokio::time::timeout(Duration::from_secs(1), admission)
+            .await
+            .expect("job admission should resume after collection")
+            .expect("job admission task should complete")
+            .expect("job should be admitted");
+        assert!(jobs.get(id).await.is_some());
     }
 }
