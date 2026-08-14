@@ -16,41 +16,28 @@ derive_more = { workspace = true, features = ["display"] }
 bsky-sdk = { workspace = true }
 egui = { version = "0.32" }
 eframe = { version = "0.32", features = ["glow", "wgpu"] }
-atrium-xrpc = "0.12.3"
-zip = "4.1.0"
-secp256k1 = { version = "0.31.0", features = ["rand", "global-context"] }
-multibase = "0.9.1"
+atrium-xrpc = "0.12.4"
+zip = { version = "8.6.0", default-features = false, features = ["aes-crypto"] }
+secp256k1 = { version = "0.31.1", features = ["rand", "global-context"] }
+multibase = "0.9.3"
 unsigned-varint = "0.8.0"
 rand = "0.9.1"
-egui_tracing = "0.2.6"
 tracing-subscriber = { workspace = true }
 tracing = { workspace = true }
-egui_extras = { version = "0.32", features = ["default", "image"] }
-egui-file-dialog = "0.12.0"
+egui_extras = { version = "0.32", default-features = false, features = ["image"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
-base64ct = { version = "1.8.0", features = ["alloc"] }
-sha2 = "0.10.9"
-base64-url = "3.0.0"
-serde_ipld_dagcbor = "0.6.3"
-indexmap = { version = "2.10.0", features = ["serde"] }
-cid = "0.11.1"
-multihash = "0.19.3"
+base64ct = { version = "1.8.3", features = ["alloc"] }
+sha2 = "0.11.0"
+serde_ipld_dagcbor = "0.7.0"
+indexmap = { version = "2.14.0", features = ["serde"] }
+cid = "0.11.3"
 hex = "0.4.3"
 ipld-core = { workspace = true }
 rfd = "0.17"
 reqwest = { workspace = true }
-
-# native:
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "time", "macros"] }
 
 # fallback to x11 on linux if wayland support is not available
 [target.'cfg(target_os = "linux")'.dependencies]
 winit = { version = "0.30", features = ["x11"] }
-
-[dev-dependencies]
-mockall = { workspace = true }
-tokio-test = { workspace = true }
-wiremock = { workspace = true }
-pretty_assertions = { workspace = true }

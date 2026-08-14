@@ -2,7 +2,7 @@ use actix_web::body::{BoxBody, EitherBody};
 use actix_web::dev::{Service, ServiceRequest, ServiceResponse, Transform};
 use actix_web::http::header::HeaderMap;
 use actix_web::{web, Error, ResponseError};
-use futures::future::{ready, LocalBoxFuture, Ready};
+use futures_util::future::{ready, LocalBoxFuture, Ready};
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
