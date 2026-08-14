@@ -16,6 +16,8 @@ pub struct ServerConfig {
     pub rate_limit_window_secs: u64,
     pub rate_limit_max_requests: u64,
     pub job_retention_secs: u64,
+    pub artifact_retention_secs: u64,
+    pub artifact_gc_interval_secs: u64,
     pub auth_token: Option<String>,
 }
 
@@ -36,6 +38,16 @@ impl AppConfig {
         let rate_limit_max_requests =
             env::var("RATE_LIMIT_MAX_REQUESTS").unwrap_or("240".to_string());
         let job_retention_secs = env::var("JOB_RETENTION_SECS").unwrap_or("3600".to_string());
+        let artifact_retention_secs =
+            env::var("ARTIFACT_RETENTION_SECS").unwrap_or("86400".to_string());
+        let artifact_gc_interval_secs: u64 = env::var("ARTIFACT_GC_INTERVAL_SECS")
+            .unwrap_or("3600".to_string())
+            .parse()
+            .unwrap();
+        assert!(
+            artifact_gc_interval_secs > 0,
+            "ARTIFACT_GC_INTERVAL_SECS must be greater than zero"
+        );
 
         Self {
             server: ServerConfig {
@@ -46,6 +58,8 @@ impl AppConfig {
                 rate_limit_window_secs: rate_limit_window_secs.parse().unwrap(),
                 rate_limit_max_requests: rate_limit_max_requests.parse().unwrap(),
                 job_retention_secs: job_retention_secs.parse().unwrap(),
+                artifact_retention_secs: artifact_retention_secs.parse().unwrap(),
+                artifact_gc_interval_secs,
                 auth_token: env::var("AUTH_TOKEN").ok(),
             },
             external_services: ExternalServices { s3_endpoint },
@@ -98,6 +112,8 @@ mod tests {
                 ("RATE_LIMIT_WINDOW_SECS", None),
                 ("RATE_LIMIT_MAX_REQUESTS", None),
                 ("JOB_RETENTION_SECS", None),
+                ("ARTIFACT_RETENTION_SECS", None),
+                ("ARTIFACT_GC_INTERVAL_SECS", None),
                 ("AUTH_TOKEN", None),
                 ("ENDPOINT", Some("https://s3.example.com")),
             ],
@@ -110,6 +126,8 @@ mod tests {
                 assert_eq!(cfg.server.rate_limit_window_secs, 60);
                 assert_eq!(cfg.server.rate_limit_max_requests, 240);
                 assert_eq!(cfg.server.job_retention_secs, 3600);
+                assert_eq!(cfg.server.artifact_retention_secs, 86400);
+                assert_eq!(cfg.server.artifact_gc_interval_secs, 3600);
                 assert!(cfg.server.auth_token.is_none());
                 assert_eq!(cfg.external_services.s3_endpoint, "https://s3.example.com");
             },
@@ -127,6 +145,8 @@ mod tests {
                 ("RATE_LIMIT_WINDOW_SECS", Some("30")),
                 ("RATE_LIMIT_MAX_REQUESTS", Some("100")),
                 ("JOB_RETENTION_SECS", Some("120")),
+                ("ARTIFACT_RETENTION_SECS", Some("600")),
+                ("ARTIFACT_GC_INTERVAL_SECS", Some("60")),
                 ("AUTH_TOKEN", Some("secret-token")),
                 ("ENDPOINT", Some("https://custom.example.com")),
             ],
@@ -139,6 +159,8 @@ mod tests {
                 assert_eq!(cfg.server.rate_limit_window_secs, 30);
                 assert_eq!(cfg.server.rate_limit_max_requests, 100);
                 assert_eq!(cfg.server.job_retention_secs, 120);
+                assert_eq!(cfg.server.artifact_retention_secs, 600);
+                assert_eq!(cfg.server.artifact_gc_interval_secs, 60);
                 assert_eq!(cfg.server.auth_token.as_deref(), Some("secret-token"));
                 assert_eq!(
                     cfg.external_services.s3_endpoint,
@@ -163,6 +185,20 @@ mod tests {
             &[
                 ("ENDPOINT", Some("https://s3.example.com")),
                 ("SERVER_PORT", Some("not-a-number")),
+            ],
+            || {
+                let _ = AppConfig::from_env();
+            },
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "ARTIFACT_GC_INTERVAL_SECS must be greater than zero")]
+    fn from_env_rejects_zero_artifact_gc_interval() {
+        with_env_guard(
+            &[
+                ("ENDPOINT", Some("https://s3.example.com")),
+                ("ARTIFACT_GC_INTERVAL_SECS", Some("0")),
             ],
             || {
                 let _ = AppConfig::from_env();

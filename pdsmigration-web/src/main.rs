@@ -4,6 +4,7 @@ mod config;
 mod errors;
 mod middleware;
 mod openapi;
+mod storage_gc;
 
 use crate::api::{
     activate_account_api, create_account_api, deactivate_account_api, enqueue_export_blobs_job_api,
@@ -31,13 +32,13 @@ use utoipa_swagger_ui::SwaggerUi;
  * Initialize the HTTP server
  *
  * @param app_config: The application configuration
+ * @param job_manager: The job manager instance
  * @return: The initialized HTTP server
  * @throws: io::Error if the server fails to start
  */
-fn init_http_server(app_config: AppConfig) -> io::Result<Server> {
+fn init_http_server(app_config: AppConfig, job_manager: JobManager) -> io::Result<Server> {
     let server_port = app_config.server.port;
     let worker_count = app_config.server.workers;
-    let job_manager = JobManager::new(Duration::from_secs(app_config.server.job_retention_secs));
     let prometheus = PrometheusMetricsBuilder::new("api")
         .endpoint("/metrics")
         .build()
@@ -108,8 +109,17 @@ async fn main() -> io::Result<()> {
     // Load App Config
     let app_config = AppConfig::from_env();
 
+    let job_manager = JobManager::new(Duration::from_secs(app_config.server.job_retention_secs));
+
+    // Periodically delete local migration artifacts left behind by finished jobs
+    tokio::spawn(storage_gc::run_periodic_gc(
+        job_manager.clone(),
+        Duration::from_secs(app_config.server.artifact_retention_secs),
+        Duration::from_secs(app_config.server.artifact_gc_interval_secs),
+    ));
+
     // Start Http Server
-    let server = init_http_server(app_config.clone())?;
+    let server = init_http_server(app_config.clone(), job_manager)?;
     tracing::info!(
         "Server started successfully on 0.0.0.0:{}",
         app_config.server.port
@@ -134,6 +144,8 @@ mod tests {
                 rate_limit_window_secs: 60,
                 rate_limit_max_requests: 60,
                 job_retention_secs: 3600,
+                artifact_retention_secs: 86400,
+                artifact_gc_interval_secs: 3600,
                 auth_token: None,
             },
             external_services: ExternalServices {
@@ -141,7 +153,7 @@ mod tests {
             },
         };
 
-        let result = init_http_server(app_config);
+        let result = init_http_server(app_config, JobManager::default());
         assert!(result.is_ok(), "Expected successful server initialization");
     }
 
@@ -157,6 +169,8 @@ mod tests {
                 rate_limit_window_secs: 60,
                 rate_limit_max_requests: 60,
                 job_retention_secs: 3600,
+                artifact_retention_secs: 86400,
+                artifact_gc_interval_secs: 3600,
                 auth_token: None,
             },
             external_services: ExternalServices {

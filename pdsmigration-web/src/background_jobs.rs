@@ -16,7 +16,7 @@ use std::io::ErrorKind;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::io::AsyncWriteExt;
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, MutexGuard, RwLock};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -126,6 +126,7 @@ impl JobRecord {
 #[derive(Clone)]
 pub struct JobManager {
     state: Arc<RwLock<JobState>>,
+    artifact_gc_guard: Arc<Mutex<()>>,
     retention: Duration,
 }
 
@@ -224,13 +225,27 @@ impl JobManager {
     pub fn new(retention: Duration) -> Self {
         Self {
             state: Arc::new(RwLock::new(JobState::default())),
+            artifact_gc_guard: Arc::new(Mutex::new(())),
             retention,
         }
+    }
+
+    pub(crate) async fn lock_artifact_gc(&self) -> MutexGuard<'_, ()> {
+        self.artifact_gc_guard.lock().await
     }
 
     pub async fn get(&self, id: Uuid) -> Option<JobRecord> {
         let st = self.state.read().await;
         st.records.get(&id).cloned()
+    }
+
+    /// True while any job is queued or running, meaning on-disk
+    /// migration artifacts may still be in use.
+    pub async fn has_active_jobs(&self) -> bool {
+        let st = self.state.read().await;
+        st.records
+            .values()
+            .any(|r| matches!(r.status, JobStatus::Queued | JobStatus::Running))
     }
 
     #[tracing::instrument(skip(self))]
@@ -254,6 +269,7 @@ impl JobManager {
         let rec = JobRecord::new(id, JobKind::UploadBlobs);
 
         {
+            let _artifact_gc_guard = self.lock_artifact_gc().await;
             let mut st = self.state.write().await;
             st.prune_finished(self.retention);
             st.records.insert(id, rec);
@@ -287,6 +303,7 @@ impl JobManager {
         let rec = JobRecord::new(id, JobKind::ExportBlobs);
 
         {
+            let _artifact_gc_guard = self.lock_artifact_gc().await;
             let mut st = self.state.write().await;
             st.prune_finished(self.retention);
             st.records.insert(id, rec);
@@ -321,6 +338,7 @@ impl JobManager {
         let rec = JobRecord::new(id, JobKind::ExportRepo);
 
         {
+            let _artifact_gc_guard = self.lock_artifact_gc().await;
             let mut st = self.state.write().await;
             st.prune_finished(self.retention);
             st.records.insert(id, rec);

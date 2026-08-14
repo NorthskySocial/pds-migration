@@ -111,6 +111,8 @@ cargo test -p pdsmigration-common
 | `WORKER_COUNT`             | No       | `2`                     | Number of worker threads              |
 | `CONCURRENT_TASKS_PER_JOB` | No       | `3`                     | Max concurrent blob processes per job |
 | `JOB_RETENTION_SECS`       | No       | `3600`                  | How long finished jobs are kept in memory before being pruned |
+| `ARTIFACT_RETENTION_SECS`  | No       | `86400`                 | How long local blob directories and repo CAR files are kept before being deleted |
+| `ARTIFACT_GC_INTERVAL_SECS`| No       | `3600`                  | How often the local artifact garbage collector runs |
 
 ### AWS S3 Configuration
 
