@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=PDS Migration
+Comment=Migrate your data data between Personal Data Servers in the AT Protocol network
+Exec=pdsmigration-gui
+Icon=pdsmigration-gui
+Terminal=false
+Categories=Network;Utility;

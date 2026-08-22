@@ -10,6 +10,18 @@ license.workspace = true
 repository.workspace = true
 description = "Desktop application to migrate an AT Protocol account between PDS servers"
 
+[package.metadata.deb]
+maintainer = "Northsky Social <support@northskysocial.com>"
+license-file = ["../LICENSE", "0"]
+section = "utils"
+priority = "optional"
+depends = "$auto"
+assets = [
+    ["target/release/pdsmigration-gui", "usr/bin/", "755"],
+    ["assets/pdsmigration-gui.desktop", "usr/share/applications/", "644"],
+    ["assets/Northsky-Icon_Color.png", "usr/share/pixmaps/pdsmigration-gui.png", "644"],
+]
+
 [lib]
 doctest = false
 
