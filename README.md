@@ -33,7 +33,7 @@ network. It consists of three main packages:
 
 - **Rust Toolchain**: 1.97.0 channel with `rustfmt` and `clippy` components
 - **Platform Support**:
-    - Native: Windows, macOS, Linux
+  - Native: Windows, macOS, Linux
 
 ### Installation
 
@@ -46,7 +46,14 @@ rustup component add rustfmt clippy
 
 ## Setup & Running
 
-### Quick Start
+### Using Prebuilt Binaries
+
+Prebuilt Windows and Linux binaries of the desktop application are available on
+the [Releases page](https://github.com/NorthskySocial/pds-migration/releases).
+
+To build from source, continue with the steps below.
+
+### Building from Source
 
 ```bash
 # Clone the repository
@@ -195,6 +202,17 @@ GitHub Actions automatically:
 - Checks code formatting and linting
 - Builds Docker containers
 - Publishes to GitHub Container Registry
+- Publishes desktop application releases
+
+### Desktop Application Releases
+
+A release workflow runs every Monday and Thursday from the state of `main`.
+
+If there are new commits that touch `pdsmigration-common`, `pdsmigration-gui` or the workspace
+manifests, it builds Windows and Linux binaries, and a new GitHub release is published
+with the related commit messages as release notes.
+
+Every release is tagged with the major and minor version of `pdsmigration-gui` and the build date as the patch number.
 
 ## Contributing
 
