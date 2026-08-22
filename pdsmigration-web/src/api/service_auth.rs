@@ -42,7 +42,7 @@ impl From<ServiceAuthApiRequest> for ServiceAuthRequest {
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
-struct ServiceAuthResponse {
+pub struct ServiceAuthResponse {
     token: String,
 }
 
