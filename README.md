@@ -48,8 +48,13 @@ rustup component add rustfmt clippy
 
 ### Using Prebuilt Binaries
 
-Prebuilt Windows and Linux binaries of the desktop application are available on
-the [Releases page](https://github.com/NorthskySocial/pds-migration/releases).
+Each release on the
+[Releases page](https://github.com/NorthskySocial/pds-migration/releases)
+contains the following prebuilt binaries:
+
+- `pdsmigration-gui.exe` for Windows
+- a `.deb` package for Debian, Ubuntu and related distributions
+- `pdsmigration-gui-linux-x86_64`, a plain binary for other Linux distributions
 
 To build from source, continue with the steps below.
 
@@ -209,8 +214,8 @@ GitHub Actions automatically:
 A release workflow runs every Monday and Thursday from the state of `main`.
 
 If there are new commits that touch `pdsmigration-common`, `pdsmigration-gui` or the workspace
-manifests, it builds Windows and Linux binaries, and a new GitHub release is published
-with the related commit messages as release notes.
+manifests, it builds the Windows executable and the Linux binary and `.deb` package, and a new
+GitHub release is published with the related commit messages as release notes.
 
 Every release is tagged with the major and minor workspace version and the build date as the patch number.
 
