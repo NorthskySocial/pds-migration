@@ -10,18 +10,6 @@ license.workspace = true
 repository.workspace = true
 description = "Desktop application to migrate an AT Protocol account between PDS servers"
 
-[package.metadata.deb]
-maintainer = "Northsky Social <support@northskysocial.com>"
-license-file = ["../LICENSE", "0"]
-section = "utils"
-priority = "optional"
-depends = "$auto"
-assets = [
-    ["target/release/pdsmigration-gui", "usr/bin/", "755"],
-    ["assets/pdsmigration-gui.desktop", "usr/share/applications/", "644"],
-    ["assets/Northsky-Icon_Color.png", "usr/share/pixmaps/pdsmigration-gui.png", "644"],
-]
-
 [lib]
 doctest = false
 
@@ -56,3 +44,26 @@ tokio = { workspace = true, features = ["rt-multi-thread", "time", "macros"] }
 # fallback to x11 on linux if wayland support is not available
 [target.'cfg(target_os = "linux")'.dependencies]
 winit = { version = "0.30", features = ["x11"] }
+
+# embeds the icon and the version information into the .exe
+[target.'cfg(windows)'.build-dependencies]
+winresource = "0.1.31"
+
+[package.metadata.deb]
+maintainer = "Northsky Social <support@northskysocial.com>"
+license-file = ["../LICENSE", "0"]
+section = "utils"
+priority = "optional"
+depends = "$auto"
+assets = [
+    ["target/release/pdsmigration-gui", "usr/bin/", "755"],
+    ["assets/pdsmigration-gui.desktop", "usr/share/applications/", "644"],
+    ["assets/Northsky-Icon_Color.png", "usr/share/pixmaps/pdsmigration-gui.png", "644"],
+]
+
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/pdsmigration-gui", dest = "/usr/bin/pdsmigration-gui", mode = "755" },
+    { source = "assets/pdsmigration-gui.desktop", dest = "/usr/share/applications/pdsmigration-gui.desktop", mode = "644" },
+    { source = "assets/Northsky-Icon_Color.png", dest = "/usr/share/pixmaps/pdsmigration-gui.png", mode = "644" },
+]

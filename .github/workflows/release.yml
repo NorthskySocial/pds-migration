@@ -101,13 +101,14 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           shared-key: release-linux
-      - name: Install cargo-deb
-        run: cargo install cargo-deb --locked
-      - name: Build binary and Debian package
+      - name: Install packaging tools
+        run: cargo install cargo-deb cargo-generate-rpm --locked
+      - name: Build binary and Linux packages
         run: |
           set -euo pipefail
           cargo build -p pdsmigration-gui --release
           cargo deb -p pdsmigration-gui --no-build --output dist/
+          cargo generate-rpm -p pdsmigration-gui --auto-req builtin --output dist/
           cp target/release/pdsmigration-gui dist/pdsmigration-gui-linux-x86_64
       - name: Upload build output
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
