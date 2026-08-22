@@ -37,8 +37,8 @@ async fn fetch_did_document(did: &str) -> Option<DidDocument> {
     let url = if let Some(host) = did.strip_prefix("did:web:") {
         format!("https://{}/.well-known/did.json", host)
     } else {
-        let directory = std::env::var("PLC_DIRECTORY")
-            .unwrap_or_else(|_| "https://plc.directory".to_string());
+        let directory =
+            std::env::var("PLC_DIRECTORY").unwrap_or_else(|_| "https://plc.directory".to_string());
         format!("{}/{}", directory.trim_end_matches('/'), did)
     };
 
