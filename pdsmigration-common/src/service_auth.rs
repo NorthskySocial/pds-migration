@@ -44,8 +44,25 @@ pub async fn get_service_auth_api(req: ServiceAuthRequest) -> Result<String, Mig
         req.did.as_str(),
         req.token.as_str(),
     )
-    .await?;
-    let token = get_service_auth(&agent, req.aud.as_str()).await?;
+    .await
+    .inspect_err(|error| {
+        tracing::error!(
+            "[{}] Service auth failed at login step on {}: {}",
+            req.did,
+            req.pds_host,
+            error
+        );
+    })?;
+    let token = get_service_auth(&agent, req.aud.as_str())
+        .await
+        .inspect_err(|error| {
+            tracing::error!(
+                "[{}] Service auth failed at token step for aud {}: {}",
+                req.did,
+                req.aud,
+                error
+            );
+        })?;
     Ok(token)
 }
 

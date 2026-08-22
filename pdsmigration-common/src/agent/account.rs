@@ -12,6 +12,17 @@ pub async fn create_account(
     account_request: &CreateAccountRequest,
 ) -> Result<(), MigrationError> {
     let did_str = account_request.did.as_str();
+    tracing::info!(
+        "[{}] Creating account on {} - handle: {}, has_email: {}, has_invite_code: {}, has_password: {}, has_recovery_key: {}, has_service_token: {}",
+        did_str,
+        pds_host,
+        account_request.handle.as_str(),
+        account_request.email.is_some(),
+        account_request.invite_code.is_some(),
+        account_request.password.is_some(),
+        account_request.recovery_key.is_some(),
+        account_request.token.is_some()
+    );
     let client = reqwest::Client::new();
     let request_body = serde_json::to_string(&CreateAccountInput {
         data: CreateAccountInputData {
@@ -56,8 +67,9 @@ pub async fn create_account(
                 let error_message = try_parse_error_response(output).await;
 
                 tracing::error!(
-                    "[{}] Failed to create account - Bad Request: {}",
+                    "[{}] Failed to create account on {} - Bad Request: {}",
                     did_str,
+                    pds_host,
                     error_message
                 );
                 return Err(MigrationError::Upstream {
@@ -71,8 +83,9 @@ pub async fn create_account(
                     .await
                     .unwrap_or_else(|_| "Unable to read response".to_string());
                 tracing::error!(
-                    "[{}] Failed to create account - Received non-OK status on Create Account: {} - Response: {}",
+                    "[{}] Failed to create account on {} - Received non-OK status on Create Account: {} - Response: {}",
                     did_str,
+                    pds_host,
                     status,
                     response_text
                 );
@@ -82,6 +95,15 @@ pub async fn create_account(
             }
         },
         Err(e) => {
+            tracing::error!(
+                "[{}] Failed to create account on {} - Request failed (timeout: {}, connect: {}, request: {}): {:?}",
+                did_str,
+                pds_host,
+                e.is_timeout(),
+                e.is_connect(),
+                e.is_request(),
+                e
+            );
             return Err(MigrationError::Runtime {
                 message: e.to_string(),
             });
