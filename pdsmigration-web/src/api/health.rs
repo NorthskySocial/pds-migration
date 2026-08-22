@@ -7,6 +7,7 @@ use actix_web::{get, Responder};
     responses(
         (status = 200, description = "Health check OK", body = String)
     ),
+    security(()),
     tag = "pdsmigration-web"
 )]
 #[get("/health")]

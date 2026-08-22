@@ -1,8 +1,24 @@
 use crate::errors::ApiError;
 use crate::errors::ApiErrorBody;
-use utoipa::OpenApi;
+use utoipa::openapi::security::{ApiKey, ApiKeyValue, SecurityScheme};
+use utoipa::{Modify, OpenApi};
 
 use crate::api::*;
+
+struct SecurityAddon;
+
+impl Modify for SecurityAddon {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        let components = openapi.components.get_or_insert_default();
+        components.security_schemes.insert(
+            "x_auth_token".to_string(),
+            SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::with_description(
+                "X-Auth-Token",
+                "Server authentication token",
+            ))),
+        );
+    }
+}
 
 #[derive(OpenApi)]
 #[openapi(
@@ -30,10 +46,12 @@ use crate::api::*;
             ExportPDSApiRequest,
             ImportPDSApiRequest,
             RequestTokenApiRequest,
+            ExportBlobsApiRequest,
             UploadBlobsApiRequest,
             MigratePreferencesApiRequest,
             MigratePlcApiRequest,
             ServiceAuthApiRequest,
+            ServiceAuthResponse,
             // Jobs
             crate::background_jobs::JobKind,
             crate::background_jobs::JobStatus,
@@ -44,6 +62,8 @@ use crate::api::*;
             ApiErrorBody
         ),
     ),
+    modifiers(&SecurityAddon),
+    security(("x_auth_token" = [])),
     tags(
         (name = "pdsmigration-web", description = "PDS Migration Web API")
     )
