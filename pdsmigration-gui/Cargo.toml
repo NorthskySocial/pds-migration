@@ -1,11 +1,14 @@
 [package]
 name = "pdsmigration-gui"
 version.workspace = true
-edition = "2021"
+edition.workspace = true
 include = [
     "**/*.rs",
     "Cargo.toml",
 ]
+license.workspace = true
+repository.workspace = true
+description = "Desktop application to migrate an AT Protocol account between PDS servers"
 
 [lib]
 doctest = false

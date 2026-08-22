@@ -1,14 +1,14 @@
 [package]
 name = "pdsmigration-common"
 version.workspace = true
-edition = "2021"
+edition.workspace = true
 include = [
     "**/*.rs",
     "Cargo.toml",
 ]
-license = "MIT"
+license.workspace = true
+repository.workspace = true
 publish = true
-repository = "https://github.com/NorthskySocial/pds-migration"
 description = "Common framework for PDS Migration"
 
 [lib]
