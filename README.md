@@ -212,7 +212,7 @@ If there are new commits that touch `pdsmigration-common`, `pdsmigration-gui` or
 manifests, it builds Windows and Linux binaries, and a new GitHub release is published
 with the related commit messages as release notes.
 
-Every release is tagged with the major and minor version of `pdsmigration-gui` and the build date as the patch number.
+Every release is tagged with the major and minor workspace version and the build date as the patch number.
 
 ## Contributing
 

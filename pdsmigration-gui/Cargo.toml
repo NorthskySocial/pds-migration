@@ -1,6 +1,6 @@
 [package]
 name = "pdsmigration-gui"
-version = "0.3.0"
+version.workspace = true
 edition = "2021"
 include = [
     "**/*.rs",

@@ -59,7 +59,7 @@ jobs:
             exit 0
           fi
 
-          VERSION="$(grep -m1 '^version = ' pdsmigration-gui/Cargo.toml | cut -d'"' -f2)"
+          VERSION="$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)"
           # The patch version is replaced by the release date (with a suffix if necessary)
           BASE="v${VERSION%.*}.$(date -u +%Y%m%d)"
           TAG="$BASE"
