@@ -47,7 +47,7 @@ pub async fn login_helper(
         Ok(_) => Ok(agent.get_session().await.unwrap()),
         Err(error) => {
             tracing::error!(
-                "[{}] Error while logging-in to {}: {}",
+                "[{}] Error while logging-in to {}: {:?}",
                 did,
                 pds_host,
                 error
@@ -79,6 +79,11 @@ pub async fn login_helper(
 pub async fn get_service_auth(agent: &BskyAgent, aud: &str) -> Result<String, MigrationError> {
     let did = agent.did().await;
     let did_str = did.as_ref().map(|d: &Did| d.as_str()).unwrap_or("unknown");
+    tracing::info!(
+        "[{}] Requesting service auth token for aud {}",
+        did_str,
+        aud
+    );
     let result = agent
         .api
         .com
@@ -86,8 +91,11 @@ pub async fn get_service_auth(agent: &BskyAgent, aud: &str) -> Result<String, Mi
         .server
         .get_service_auth(GetServiceAuthParams {
             data: GetServiceAuthParamsData {
-                aud: aud.parse().map_err(|_error| MigrationError::Validation {
-                    field: "Aud is invalid".to_string(),
+                aud: aud.parse().map_err(|_error| {
+                    tracing::error!("[{}] Invalid aud value: {}", did_str, aud);
+                    MigrationError::Validation {
+                        field: "Aud is invalid".to_string(),
+                    }
                 })?,
                 exp: None,
                 lxm: Some(Nsid::new("com.atproto.server.createAccount".to_string()).unwrap()),
@@ -97,7 +105,7 @@ pub async fn get_service_auth(agent: &BskyAgent, aud: &str) -> Result<String, Mi
         .await
         .map_err(|error| {
             tracing::error!(
-                "[{}] Failed to get service auth token for {}: {}",
+                "[{}] Failed to get service auth token for {}: {:?}",
                 did_str,
                 aud,
                 error
@@ -106,5 +114,10 @@ pub async fn get_service_auth(agent: &BskyAgent, aud: &str) -> Result<String, Mi
                 message: error.to_string(),
             }
         })?;
+    tracing::info!(
+        "[{}] Successfully obtained service auth token for aud {}",
+        did_str,
+        aud
+    );
     Ok(result.token.clone())
 }

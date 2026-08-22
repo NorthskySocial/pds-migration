@@ -81,12 +81,22 @@ pub async fn create_account_api(
     let did = req.did.clone();
     tracing::info!("[{}] Create account request received", did);
 
-    let did_parsed = req.did.parse().map_err(|_error| ApiError::Validation {
-        field: "did".to_string(),
+    let did_parsed = req.did.parse().map_err(|_error| {
+        tracing::error!("[{}] Create account request has an invalid DID", did);
+        ApiError::Validation {
+            field: "did".to_string(),
+        }
     })?;
 
-    let handle = req.handle.parse().map_err(|_error| ApiError::Validation {
-        field: "handle".to_string(),
+    let handle = req.handle.parse().map_err(|_error| {
+        tracing::error!(
+            "[{}] Create account request has an invalid handle: {}",
+            did,
+            req.handle
+        );
+        ApiError::Validation {
+            field: "handle".to_string(),
+        }
     })?;
 
     create_account(
@@ -105,7 +115,16 @@ pub async fn create_account_api(
         },
     )
     .await
-    .map_err(ApiError::from)?;
+    .map_err(|error| {
+        tracing::error!(
+            "[{}] Create account failed on {} with invite code {}: {}",
+            did,
+            req.pds_host,
+            req.invite_code,
+            error
+        );
+        ApiError::from(error)
+    })?;
 
     tracing::info!(
         "[{}] Account created successfully - Used invite code {}",

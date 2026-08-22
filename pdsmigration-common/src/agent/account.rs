@@ -3,8 +3,130 @@ use crate::{
     DeactivatedAccountInput, DeactivatedAccountInputData, MigrationError, APPLICATION_JSON,
     CREATE_ACCOUNT_PATH,
 };
+use base64ct::Encoding;
 use bsky_sdk::BskyAgent;
 use ipld_core::ipld::Ipld;
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+struct TokenClaims {
+    iss: Option<String>,
+    aud: Option<String>,
+    lxm: Option<String>,
+    exp: Option<i64>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DidDocument {
+    #[serde(default)]
+    verification_method: Vec<DidDocumentEntry>,
+    #[serde(default)]
+    service: Vec<DidDocumentEntry>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DidDocumentEntry {
+    id: String,
+    public_key_multibase: Option<String>,
+    service_endpoint: Option<serde_json::Value>,
+}
+
+async fn fetch_did_document(did: &str) -> Option<DidDocument> {
+    let url = if let Some(host) = did.strip_prefix("did:web:") {
+        format!("https://{}/.well-known/did.json", host)
+    } else {
+        let directory =
+            std::env::var("PLC_DIRECTORY").unwrap_or_else(|_| "https://plc.directory".to_string());
+        format!("{}/{}", directory.trim_end_matches('/'), did)
+    };
+
+    let body = async {
+        reqwest::Client::new()
+            .get(&url)
+            .timeout(std::time::Duration::from_secs(2))
+            .send()
+            .await?
+            .text()
+            .await
+    }
+    .await;
+
+    match body {
+        Ok(body) => serde_json::from_str(&body).ok(),
+        Err(error) => {
+            tracing::warn!("[{}] Unable to read {}: {}", did, url, error);
+            None
+        }
+    }
+}
+
+/// Logs why the PDS refused a service auth token
+async fn log_service_token_diagnostics(did: &str, token: Option<&str>) {
+    let claims = token
+        .and_then(|token| token.split('.').nth(1))
+        .and_then(|payload| base64ct::Base64UrlUnpadded::decode_vec(payload).ok())
+        .and_then(|payload| serde_json::from_slice::<TokenClaims>(&payload).ok());
+    let Some(claims) = claims else {
+        tracing::error!(
+            "[{}] The create account request had no readable service auth token",
+            did
+        );
+        return;
+    };
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|since_epoch| since_epoch.as_secs() as i64)
+        .unwrap_or_default();
+    let document = fetch_did_document(did).await;
+    let signing_key = document
+        .as_ref()
+        .and_then(|document| {
+            document
+                .verification_method
+                .iter()
+                .find(|method| method.id.ends_with("#atproto"))
+                .and_then(|method| method.public_key_multibase.clone())
+        })
+        .unwrap_or_else(|| "unknown".to_string());
+    let pds_endpoint = document
+        .as_ref()
+        .and_then(|document| {
+            document
+                .service
+                .iter()
+                .find(|service| service.id.ends_with("#atproto_pds"))
+                .and_then(|service| service.service_endpoint.as_ref())
+                .map(|endpoint| endpoint.to_string())
+        })
+        .unwrap_or_else(|| "unknown".to_string());
+
+    let cause = if claims.iss.as_deref() != Some(did) {
+        "the token was issued for a different account, because iss does not match the DID"
+    } else if claims.exp.is_some_and(|exp| exp <= now) {
+        "the token has expired"
+    } else {
+        "iss and exp are correct, the old PDS may have signed the token with a different key than the DID document sets"
+    };
+
+    tracing::error!(
+        "[{}] Service auth token - iss: {}, aud: {}, lxm: {}, exp: {}, now: {}; DID document signing key: {}, pds: {}; probable cause: {}",
+        did,
+        claims.iss.as_deref().unwrap_or("absent"),
+        claims.aud.as_deref().unwrap_or("absent"),
+        claims.lxm.as_deref().unwrap_or("absent"),
+        claims
+            .exp
+            .map(|exp| exp.to_string())
+            .unwrap_or_else(|| "absent".to_string()),
+        now,
+        signing_key,
+        pds_endpoint,
+        cause
+    );
+}
 
 #[tracing::instrument(skip(account_request))]
 pub async fn create_account(
@@ -12,6 +134,17 @@ pub async fn create_account(
     account_request: &CreateAccountRequest,
 ) -> Result<(), MigrationError> {
     let did_str = account_request.did.as_str();
+    tracing::info!(
+        "[{}] Creating account on {} - handle: {}, has_email: {}, has_invite_code: {}, has_password: {}, has_recovery_key: {}, has_service_token: {}",
+        did_str,
+        pds_host,
+        account_request.handle.as_str(),
+        account_request.email.is_some(),
+        account_request.invite_code.is_some(),
+        account_request.password.is_some(),
+        account_request.recovery_key.is_some(),
+        account_request.token.is_some()
+    );
     let client = reqwest::Client::new();
     let request_body = serde_json::to_string(&CreateAccountInput {
         data: CreateAccountInputData {
@@ -56,10 +189,12 @@ pub async fn create_account(
                 let error_message = try_parse_error_response(output).await;
 
                 tracing::error!(
-                    "[{}] Failed to create account - Bad Request: {}",
+                    "[{}] Failed to create account on {} - Bad Request: {}",
                     did_str,
+                    pds_host,
                     error_message
                 );
+                log_service_token_diagnostics(did_str, account_request.token.as_deref()).await;
                 return Err(MigrationError::Upstream {
                     message: error_message,
                 });
@@ -71,17 +206,28 @@ pub async fn create_account(
                     .await
                     .unwrap_or_else(|_| "Unable to read response".to_string());
                 tracing::error!(
-                    "[{}] Failed to create account - Received non-OK status on Create Account: {} - Response: {}",
+                    "[{}] Failed to create account on {} - Received non-OK status on Create Account: {} - Response: {}",
                     did_str,
+                    pds_host,
                     status,
                     response_text
                 );
+                log_service_token_diagnostics(did_str, account_request.token.as_deref()).await;
                 return Err(MigrationError::Runtime {
                     message: "Failed to create account".to_string(),
                 });
             }
         },
         Err(e) => {
+            tracing::error!(
+                "[{}] Failed to create account on {} - Request failed (timeout: {}, connect: {}, request: {}): {:?}",
+                did_str,
+                pds_host,
+                e.is_timeout(),
+                e.is_connect(),
+                e.is_request(),
+                e
+            );
             return Err(MigrationError::Runtime {
                 message: e.to_string(),
             });
@@ -131,4 +277,125 @@ pub async fn activate_account_agent(agent: &BskyAgent) -> Result<(), MigrationEr
             }
         })?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use wiremock::{
+        matchers::{method, path},
+        Mock, MockServer, ResponseTemplate,
+    };
+
+    fn jwt(claims: serde_json::Value) -> String {
+        format!(
+            "header.{}.signature",
+            base64ct::Base64UrlUnpadded::encode_string(claims.to_string().as_bytes())
+        )
+    }
+
+    // PLC_DIRECTORY is process-wide state, so the tests that set it run one after the other.
+    static PLC_DIRECTORY_GUARD: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+    #[tokio::test]
+    async fn fetch_did_document_reads_the_atproto_entries() {
+        let _guard = PLC_DIRECTORY_GUARD.lock().await;
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/did:plc:abc123"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(
+                serde_json::json!({
+                    "verificationMethod": [{
+                        "id": "did:plc:abc123#atproto",
+                        "publicKeyMultibase": "zQ3shokFTS3brHcDQrn82RUDfCZESWL1ZdCEJwekUDPQiYBme",
+                    }],
+                    "service": [{ "id": "#atproto_pds", "serviceEndpoint": "https://old.example.com" }],
+                })
+                .to_string(),
+            ))
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/did:plc:def456"))
+            .respond_with(ResponseTemplate::new(404).set_body_string("not found"))
+            .mount(&server)
+            .await;
+        std::env::set_var("PLC_DIRECTORY", server.uri());
+
+        let document = fetch_did_document("did:plc:abc123")
+            .await
+            .expect("the mock gives a DID document");
+        assert_eq!(document.verification_method[0].id, "did:plc:abc123#atproto");
+        assert_eq!(
+            document.verification_method[0]
+                .public_key_multibase
+                .as_deref(),
+            Some("zQ3shokFTS3brHcDQrn82RUDfCZESWL1ZdCEJwekUDPQiYBme")
+        );
+        assert_eq!(document.service[0].id, "#atproto_pds");
+        assert_eq!(
+            document.service[0]
+                .service_endpoint
+                .as_ref()
+                .and_then(|endpoint| endpoint.as_str()),
+            Some("https://old.example.com")
+        );
+
+        assert!(fetch_did_document("did:plc:def456").await.is_none());
+
+        std::env::set_var("PLC_DIRECTORY", "http://127.0.0.1:1");
+        assert!(fetch_did_document("did:plc:ghi789").await.is_none());
+
+        std::env::remove_var("PLC_DIRECTORY");
+    }
+
+    #[tokio::test]
+    async fn service_token_diagnostics_survive_every_input() {
+        let _guard = PLC_DIRECTORY_GUARD.lock().await;
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/did:plc:abc123"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(
+                serde_json::json!({
+                    "verificationMethod": [{
+                        "id": "did:plc:abc123#atproto",
+                        "publicKeyMultibase": "zQ3shokFTS3brHcDQrn82RUDfCZESWL1ZdCEJwekUDPQiYBme",
+                    }],
+                    "service": [{ "id": "#atproto_pds", "serviceEndpoint": "https://old.example.com" }],
+                })
+                .to_string(),
+            ))
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/did:plc:def456"))
+            .respond_with(ResponseTemplate::new(404).set_body_string("not found"))
+            .mount(&server)
+            .await;
+        std::env::set_var("PLC_DIRECTORY", server.uri());
+
+        for token in [
+            None,
+            Some(""),
+            Some("not-a-jwt"),
+            Some("!!!.???.signature"),
+            Some("header.e30.signature"),
+        ] {
+            log_service_token_diagnostics("did:plc:abc123", token).await;
+        }
+
+        let token = jwt(serde_json::json!({
+            "iss": "did:plc:abc123",
+            "aud": "did:web:new.example.com",
+            "lxm": "com.atproto.server.createAccount",
+            "exp": 1_600_000_060,
+        }));
+        log_service_token_diagnostics("did:plc:abc123", Some(token.as_str())).await;
+        log_service_token_diagnostics("did:plc:def456", Some(token.as_str())).await;
+
+        std::env::set_var("PLC_DIRECTORY", "http://127.0.0.1:1");
+        log_service_token_diagnostics("did:plc:ghi789", Some(token.as_str())).await;
+
+        std::env::remove_var("PLC_DIRECTORY");
+    }
 }
