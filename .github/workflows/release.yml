@@ -135,7 +135,7 @@ jobs:
       - name: Build AppImage
         env:
           APPIMAGE_EXTRACT_AND_RUN: 1
-          OUTPUT: dist/pdsmigration-gui-x86_64.AppImage
+          LDAI_OUTPUT: dist/pdsmigration-gui-x86_64.AppImage
         run: |
           set -euo pipefail
 
