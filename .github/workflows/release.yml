@@ -1,34 +1,226 @@
-# .github/workflows/release.yml
 name: Release
 
 on:
-  release:
-    types: [created]
+  schedule:
+    # Mondays and Thursdays at 22:00 UTC
+    - cron: "0 22 * * 1,4"
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 permissions:
-  contents: write
-  packages: write
-  issues: write
+  contents: read
+
+env:
+  RELEASE_PATHS: >-
+    pdsmigration-common
+    pdsmigration-gui
+    Cargo.toml
+    Cargo.lock
+    rust-toolchain.toml
+    LICENSE
+
 jobs:
-  release:
-    name: release ${{ matrix.target }}
+  check:
+    name: Check for desktop application changes
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: x86_64-pc-windows-gnu
-            archive: zip
-          - target: x86_64-unknown-linux-musl
-            archive: tar.gz
+    outputs:
+      should_release: ${{ steps.diff.outputs.should_release }}
+      tag: ${{ steps.diff.outputs.tag }}
+      version: ${{ steps.diff.outputs.version }}
+      title: ${{ steps.diff.outputs.title }}
+      notes: ${{ steps.diff.outputs.notes }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Compare main against the most recent release
+        id: diff
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          PREV_TAG="$(gh release view --json tagName --jq .tagName 2>/dev/null || true)"
+          if [ -n "$PREV_TAG" ] && git rev-parse -q --verify "refs/tags/$PREV_TAG" >/dev/null; then
+            RANGE="$PREV_TAG..HEAD"
+          else
+            echo "No usable previous release tag, comparing against the full history"
+            RANGE="HEAD"
+          fi
+
+          COMMITS="$(git log --no-merges --format='- %s (%h)' $RANGE -- $RELEASE_PATHS)"
+          if [ -z "$COMMITS" ]; then
+            echo "No desktop application changes since ${PREV_TAG:-the first commit}, skipping the release"
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          VERSION="$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)"
+          # The patch version is replaced by the release date (with a suffix if necessary)
+          BASE="v${VERSION%.*}.$(date -u +%Y%m%d)"
+          TAG="$BASE"
+          N=1
+          while git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; do
+            TAG="$BASE+$N"
+            N=$((N + 1))
+          done
+
+          {
+            echo "should_release=true"
+            echo "tag=$TAG"
+            echo "version=${TAG#v}"
+            echo "title=$TAG - Desktop application"
+            echo "notes<<EOF_NOTES"
+            echo "This is a new release of the PDS Migration desktop GUI application."
+            echo ""
+            echo "## Which file do I need?"
+            echo ""
+            echo "Download the appropriate file for your system and follow these instructions to set it up!"
+            echo ""
+            echo "| Your system | File | How to install | How to use |"
+            echo "| --- | --- | --- | --- |"
+            echo "| Windows | the \`.exe\` file | No installation necessary | Double-click the file |"
+            echo "| Debian, Ubuntu, Linux Mint | the \`.deb\` file | \`sudo apt install ./pdsmigration-gui_*.deb\` | Start \"PDS Migration\" from the application menu |"
+            echo "| Fedora, RHEL, openSUSE | the \`.rpm\` file | \`sudo dnf install ./pdsmigration-gui-*.rpm\` | Start \"PDS Migration\" from the application menu |"
+            echo "| Any other Linux | the \`.AppImage\` file | \`chmod +x pdsmigration-gui-x86_64.AppImage\` | Double-click the file |"
+            echo ""
+            echo "You can also download the plain binary \`pdsmigration-gui-linux-x86_64\` in Linux."
+            echo ""
+            echo "## Changes"
+            echo ""
+            echo "$COMMITS"
+            echo "EOF_NOTES"
+          } >> "$GITHUB_OUTPUT"
+
+  build-linux:
+    name: Build Linux
+    needs: check
+    if: github.ref == 'refs/heads/main' && needs.check.outputs.should_release == 'true'
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Compile and release
-        uses: rust-build/rust-build.action@6febf1b0ed6499a46610b58ef9d810398e75f3c2 # v1.4.5
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev \
+            libxkbcommon-dev libssl-dev
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # v1
         with:
-          RUSTTARGET: ${{ matrix.target }}
-          ARCHIVE_TYPES: ${{ matrix.archive }}
-          SRC_DIR: "pdsmigration-gui"
+          toolchain: 1.97.0
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: release-linux
+      - name: Set the release version
+        env:
+          VERSION: ${{ needs.check.outputs.version }}
+        run: sed -i '0,/^version = ".*"$/s//version = "'"$VERSION"'"/' Cargo.toml
+      - name: Install packaging tools
+        run: cargo install cargo-deb cargo-generate-rpm --locked
+      - name: Build binary and Linux packages
+        run: |
+          set -euo pipefail
+          cargo build -p pdsmigration-gui --release
+          cargo deb -p pdsmigration-gui --no-build --output dist/
+          cargo generate-rpm -p pdsmigration-gui --auto-req builtin --output dist/
+          cp target/release/pdsmigration-gui dist/pdsmigration-gui-linux-x86_64
+      - name: Build AppImage
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
+          LDAI_OUTPUT: dist/pdsmigration-gui-x86_64.AppImage
+        run: |
+          set -euo pipefail
+
+          linuxdeploy_url="https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20251107-1/linuxdeploy-x86_64.AppImage"
+          linuxdeploy_plugin_url="https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/1-alpha-20250213-1/linuxdeploy-plugin-appimage-x86_64.AppImage"
+          linuxdeploy_sha256="c20cd71e3a4e3b80c3483cef793cda3f4e990aca14014d23c544ca3ce1270b4d"
+          linuxdeploy_plugin_sha256="992d502a248e14ab185448ddf6f6e7d25558cb84d4623c354c3af350c25fccb3"
+
+          curl -fsSL -o linuxdeploy "$linuxdeploy_url"
+          echo "$linuxdeploy_sha256  linuxdeploy" | sha256sum -c -
+
+          curl -fsSL -o linuxdeploy-plugin-appimage "$linuxdeploy_plugin_url"
+          echo "$linuxdeploy_plugin_sha256  linuxdeploy-plugin-appimage" | sha256sum -c -
+
+          chmod +x linuxdeploy linuxdeploy-plugin-appimage
+          cp pdsmigration-gui/assets/Northsky-Icon_Color.png pdsmigration-gui.png
+
+          PATH="$PWD:$PATH" ./linuxdeploy \
+            --appdir AppDir \
+            --executable target/release/pdsmigration-gui \
+            --desktop-file pdsmigration-gui/assets/pdsmigration-gui.desktop \
+            --icon-file pdsmigration-gui.png \
+            --output appimage
+      - name: Upload build output
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: build-linux
+          path: dist/*
+          if-no-files-found: error
+
+  build-windows:
+    name: Build Windows
+    needs: check
+    if: github.ref == 'refs/heads/main' && needs.check.outputs.should_release == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # v1
+        with:
+          toolchain: 1.97.0
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: release-windows
+      - name: Set the release version
+        shell: bash
+        env:
+          VERSION: ${{ needs.check.outputs.version }}
+        run: sed -i '0,/^version = ".*"$/s//version = "'"$VERSION"'"/' Cargo.toml
+      - name: Build binary
+        run: cargo build -p pdsmigration-gui --release
+      - name: Upload build output
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: build-windows
+          path: target/release/pdsmigration-gui.exe
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: [check, build-linux, build-windows]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download build output
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: dist
+          pattern: build-*
+          merge-multiple: true
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.check.outputs.tag }}
+          TITLE: ${{ needs.check.outputs.title }}
+          NOTES: ${{ needs.check.outputs.notes }}
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$NOTES" > release-notes.md
+          gh release create "$TAG" dist/* \
+            --target "$GITHUB_SHA" \
+            --title "$TITLE" \
+            --notes-file release-notes.md \
+            --latest

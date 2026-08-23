@@ -1,12 +1,13 @@
 [package]
 name = "pdsmigration-web"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 include = [
     "**/*.rs",
     "Cargo.toml",
 ]
-license = "MIT"
+license.workspace = true
+repository.workspace = true
 
 [[bin]]
 name = "pdsmigration-web"
