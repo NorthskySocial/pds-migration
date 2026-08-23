@@ -110,6 +110,28 @@ jobs:
           cargo deb -p pdsmigration-gui --no-build --output dist/
           cargo generate-rpm -p pdsmigration-gui --auto-req builtin --output dist/
           cp target/release/pdsmigration-gui dist/pdsmigration-gui-linux-x86_64
+      - name: Build AppImage
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
+          OUTPUT: dist/pdsmigration-gui-x86_64.AppImage
+        run: |
+          set -euo pipefail
+          base="https://github.com/linuxdeploy"
+
+          curl -fsSL -o linuxdeploy \
+            "$base/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage"
+          curl -fsSL -o linuxdeploy-plugin-appimage \
+            "$base/linuxdeploy-plugin-appimage/releases/download/continuous/linuxdeploy-plugin-appimage-x86_64.AppImage"
+
+          chmod +x linuxdeploy linuxdeploy-plugin-appimage
+          cp pdsmigration-gui/assets/Northsky-Icon_Color.png pdsmigration-gui.png
+
+          PATH="$PWD:$PATH" ./linuxdeploy \
+            --appdir AppDir \
+            --executable target/release/pdsmigration-gui \
+            --desktop-file pdsmigration-gui/assets/pdsmigration-gui.desktop \
+            --icon-file pdsmigration-gui.png \
+            --output appimage
       - name: Upload build output
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
