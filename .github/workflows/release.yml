@@ -20,6 +20,7 @@ env:
     Cargo.toml
     Cargo.lock
     rust-toolchain.toml
+    LICENSE
 
 jobs:
   check:
@@ -100,7 +101,7 @@ jobs:
   build-linux:
     name: Build Linux
     needs: check
-    if: needs.check.outputs.should_release == 'true'
+    if: github.ref == 'refs/heads/main' && needs.check.outputs.should_release == 'true'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -137,12 +138,17 @@ jobs:
           OUTPUT: dist/pdsmigration-gui-x86_64.AppImage
         run: |
           set -euo pipefail
-          base="https://github.com/linuxdeploy"
 
-          curl -fsSL -o linuxdeploy \
-            "$base/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage"
-          curl -fsSL -o linuxdeploy-plugin-appimage \
-            "$base/linuxdeploy-plugin-appimage/releases/download/continuous/linuxdeploy-plugin-appimage-x86_64.AppImage"
+          linuxdeploy_url="https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20251107-1/linuxdeploy-x86_64.AppImage"
+          linuxdeploy_plugin_url="https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/1-alpha-20250213-1/linuxdeploy-plugin-appimage-x86_64.AppImage"
+          linuxdeploy_sha256="c20cd71e3a4e3b80c3483cef793cda3f4e990aca14014d23c544ca3ce1270b4d"
+          linuxdeploy_plugin_sha256="992d502a248e14ab185448ddf6f6e7d25558cb84d4623c354c3af350c25fccb3"
+
+          curl -fsSL -o linuxdeploy "$linuxdeploy_url"
+          echo "$linuxdeploy_sha256  linuxdeploy" | sha256sum -c -
+
+          curl -fsSL -o linuxdeploy-plugin-appimage "$linuxdeploy_plugin_url"
+          echo "$linuxdeploy_plugin_sha256  linuxdeploy-plugin-appimage" | sha256sum -c -
 
           chmod +x linuxdeploy linuxdeploy-plugin-appimage
           cp pdsmigration-gui/assets/Northsky-Icon_Color.png pdsmigration-gui.png
@@ -163,7 +169,7 @@ jobs:
   build-windows:
     name: Build Windows
     needs: check
-    if: needs.check.outputs.should_release == 'true'
+    if: github.ref == 'refs/heads/main' && needs.check.outputs.should_release == 'true'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -192,6 +198,7 @@ jobs:
   release:
     name: Publish release
     needs: [check, build-linux, build-windows]
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
