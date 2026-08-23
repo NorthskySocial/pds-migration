@@ -28,6 +28,7 @@ jobs:
     outputs:
       should_release: ${{ steps.diff.outputs.should_release }}
       tag: ${{ steps.diff.outputs.tag }}
+      version: ${{ steps.diff.outputs.version }}
       title: ${{ steps.diff.outputs.title }}
       notes: ${{ steps.diff.outputs.notes }}
     steps:
@@ -72,6 +73,7 @@ jobs:
           {
             echo "should_release=true"
             echo "tag=$TAG"
+            echo "version=${TAG#v}"
             echo "title=$TAG - Desktop application"
             echo "notes<<EOF_NOTES"
             echo "## Changes"
@@ -101,6 +103,10 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           shared-key: release-linux
+      - name: Set the release version
+        env:
+          VERSION: ${{ needs.check.outputs.version }}
+        run: sed -i '0,/^version = ".*"$/s//version = "'"$VERSION"'"/' Cargo.toml
       - name: Install packaging tools
         run: cargo install cargo-deb cargo-generate-rpm --locked
       - name: Build binary and Linux packages
@@ -154,6 +160,11 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           shared-key: release-windows
+      - name: Set the release version
+        shell: bash
+        env:
+          VERSION: ${{ needs.check.outputs.version }}
+        run: sed -i '0,/^version = ".*"$/s//version = "'"$VERSION"'"/' Cargo.toml
       - name: Build binary
         run: cargo build -p pdsmigration-gui --release
       - name: Upload build output
