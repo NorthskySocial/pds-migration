@@ -82,21 +82,22 @@ pub async fn import_pds_api(
             message: error.to_string(),
         })?;
 
-    // Save the file locally using AWS SDK's built-in method
-    let body_bytes = s3_response
-        .body
-        .collect()
+    // Save the file locally, streaming the S3 body to disk.
+    let file_path = repo_car_path(&did).map_err(|error| ApiError::Runtime {
+        message: error.to_string(),
+    })?;
+    let mut reader = s3_response.body.into_async_read();
+    let mut file =
+        tokio::fs::File::create(&file_path)
+            .await
+            .map_err(|error| ApiError::Runtime {
+                message: error.to_string(),
+            })?;
+    tokio::io::copy(&mut reader, &mut file)
         .await
         .map_err(|error| ApiError::Runtime {
             message: error.to_string(),
         })?;
-
-    let file_path = repo_car_path(&did).map_err(|error| ApiError::Runtime {
-        message: error.to_string(),
-    })?;
-    std::fs::write(&file_path, body_bytes.into_bytes()).map_err(|error| ApiError::Runtime {
-        message: error.to_string(),
-    })?;
     pdsmigration_common::import_pds_api(req_inner.into()).await?;
     tracing::info!("[{}] Repository imported successfully", did);
 

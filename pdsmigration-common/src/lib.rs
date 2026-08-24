@@ -34,6 +34,8 @@ pub use upload_blobs::*;
 pub const REDACTED: &str = "[REDACTED]";
 pub const APPLICATION_JSON: &str = "application/json";
 
+pub use bytes::Bytes;
+
 #[derive(Deserialize, Serialize)]
 pub struct GetRepoRequest {
     pub did: Did,
